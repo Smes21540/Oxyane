@@ -197,17 +197,20 @@ function dedupeHeaders(arr) {
     const k = (h == null ? "" : String(h));
     hc[k] = (hc[k] || 0) + 1;
 
-    // Règle spéciale uniquement pour les colonnes contenant "SONDE"
-    if (k.toUpperCase().includes("SONDE")) {
+    // Détection des mots-clés spéciaux : SONDE ou TEMP
+    const upperK = k.toUpperCase();
+    if (upperK.includes("SONDE") || upperK.includes("TEMP")) {
       if (hc[k] === 1) return `${k} Consigne`;
       if (hc[k] === 2) return `${k} Valeur`;
       return `${k}_${hc[k]}`;
     }
 
-    // Sinon : on garde le nom original, en ajoutant un suffixe si doublon
+    // Sinon : garder le nom original, suffixé si doublon
     return hc[k] === 1 ? k : `${k}_${hc[k]}`;
   });
 }
+
+
 
   function capitalizeFirst(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;}
   function dayLabelFR(ts){
@@ -551,3 +554,4 @@ function dedupeHeaders(arr) {
 
 </body>
 </html>
+
