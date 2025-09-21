@@ -464,7 +464,20 @@ function displayFiles(files, folderName){
     const tdDate=document.createElement('td'); tdDate.textContent=date||'';
     const tdName=document.createElement('td'); tdName.textContent=f.name;
     const tdFolder=document.createElement('td'); tdFolder.textContent=folderName;
-    const tdSize=document.createElement('td'); tdSize.textContent=f.size ? formatSize(f.size) : '?';
+const tdSize = document.createElement('td');
+if (f.size) {
+  tdSize.textContent = formatSize(f.size);
+
+  if (parseInt(f.size) < 200) {
+    tdSize.style.color = "#999";      // gris clair
+    tdSize.textContent += " (vide)";  // ajoute le tag
+  } else {
+    tdSize.style.color = "inherit";   // couleur normale
+  }
+} else {
+  tdSize.textContent = '?';
+}
+
 
     const tdAction=document.createElement('td'); tdAction.className='action-cell';
     let html='';
@@ -794,44 +807,3 @@ window.onload=()=>{
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
