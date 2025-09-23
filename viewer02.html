@@ -445,7 +445,7 @@
     }
   };
 
-// Plugin lignes Z3 avec tooltip au survol
+// Plugin lignes Z3 avec tooltip stylé (heure + message + address, traits noirs pointillés)
 const z3LinesPlugin = {
   id: 'z3Lines',
   afterDatasetsDraw(chartArg){
@@ -454,7 +454,8 @@ const z3LinesPlugin = {
     const { top, bottom } = chartArg.chartArea;
     const ctx = chartArg.ctx;
     ctx.save();
-    ctx.strokeStyle = 'red';
+    ctx.strokeStyle = 'black';
+    ctx.setLineDash([5,5]); // pointillé
     ctx.lineWidth = 1;
 
     // dessiner les lignes
@@ -475,32 +476,70 @@ const z3LinesPlugin = {
       z3Events.forEach(ev=>{
         const x = xScale.getPixelForValue(ev.time.getTime());
         const d = Math.abs(mouse.x - x);
-        if(d < 6 && d < dist){ // 6 px de tolérance
+        if(d < 6 && d < dist){
           nearest = {ev,x};
           dist=d;
         }
       });
       if(nearest){
         const {ev,x} = nearest;
-        const tooltipY = top + 20;
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 1;
+        const tooltipY = top + 25;
+
+        // Texte : heure + message + adresse
+        const h = String(ev.time.getHours()).padStart(2,'0')+":"+
+                  String(ev.time.getMinutes()).padStart(2,'0');
+        const line1 = `⏰ ${h}`;
+        const line2 = ev.label;
+        const line3 = ev.address ? `📍 ${ev.address}` : "";
         ctx.font = '12px sans-serif';
-        const text = ev.label;
-        const w = ctx.measureText(text).width + 10;
+        const w = Math.max(
+          ctx.measureText(line1).width,
+          ctx.measureText(line2).width,
+          ctx.measureText(line3).width
+        ) + 14;
+
+        // Style basé sur le thème
+        const panel = getCSSVar('--panel') || '#fff';
+        const accent = getCSSVar('--accent') || 'black';
+
+        ctx.fillStyle = panel;
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 1;
+        ctx.shadowColor = 'rgba(0,0,0,0.25)';
+        ctx.shadowBlur = 4;
+
+        // boîte arrondie
+        const boxX = x - w/2;
+        const boxY = tooltipY - 20;
+        const boxH = line3 ? 48 : 36;
+        const r = 6;
         ctx.beginPath();
-        ctx.rect(x - w/2, tooltipY - 14, w, 20);
+        ctx.moveTo(boxX+r, boxY);
+        ctx.lineTo(boxX+w-r, boxY);
+        ctx.quadraticCurveTo(boxX+w, boxY, boxX+w, boxY+r);
+        ctx.lineTo(boxX+w, boxY+boxH-r);
+        ctx.quadraticCurveTo(boxX+w, boxY+boxH, boxX+w-r, boxY+boxH);
+        ctx.lineTo(boxX+r, boxY+boxH);
+        ctx.quadraticCurveTo(boxX, boxY+boxH, boxX, boxY+boxH-r);
+        ctx.lineTo(boxX, boxY+r);
+        ctx.quadraticCurveTo(boxX, boxY, boxX+r, boxY);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = 'red';
+
+        // Texte
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = accent;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(text, x, tooltipY - 4);
+        ctx.fillText(line1, x, boxY + 10);
+        ctx.fillText(line2, x, boxY + 25);
+        if(line3) ctx.fillText(line3, x, boxY + 40);
       }
     }
 
     ctx.restore();
+    ctx.setLineDash([]); // reset style
   }
 };
 
@@ -534,6 +573,8 @@ const z3LinesPlugin = {
     const idxTime = headersZ.findIndex(h => String(h||'').toLowerCase().includes('trigger') && String(h||'').toLowerCase().includes('time'));
     let idxMsg  = headersZ.findIndex(h => String(h||'').toLowerCase().includes('message'));
     if (idxMsg === -1) idxMsg = headersZ.findIndex(h => String(h||'').toLowerCase().includes('event'));
+let idxAddr = headersZ.findIndex(h => String(h||'').toLowerCase().includes('address'));
+
 
     rows.forEach(r => {
       const dateStr = r[idxDate];
@@ -549,7 +590,14 @@ const z3LinesPlugin = {
       }else{
         dt = new Date(`${String(dateStr)}T${String(timeStr)}`);
       }
-      if (!isNaN(dt.getTime())) z3Events.push({ time: dt, label: String(label) });
+if (!isNaN(dt.getTime())) {
+  z3Events.push({
+    time: dt,
+    label: String(label),
+    address: idxAddr >= 0 ? String(r[idxAddr]) : ""
+  });
+}
+
     });
 
     // Afficher le bouton
@@ -693,7 +741,7 @@ const z3LinesPlugin = {
   document.getElementById('toggleZ3').onclick = () => {
     z3Visible = !z3Visible;
     const btn = document.getElementById('toggleZ3');
-    btn.textContent = z3Visible ? '🚨 Événements Z3 ON' : '🚨 Événements Z3 OFF';
+    btn.textContent = z3Visible ? '🚨 Événements ON' : '🚨 Événements OFF';
     btn.style.background = z3Visible ? getCSSVar('--accent-darker') : getCSSVar('--accent');
     if (chart) chart.update('none');
   };
@@ -883,6 +931,3 @@ const z3LinesPlugin = {
   </script>
 </body>
 </html>
-
-
-
