@@ -591,12 +591,18 @@ let idxAddr = headersZ.findIndex(h => String(h||'').toLowerCase().includes('addr
         dt = new Date(`${String(dateStr)}T${String(timeStr)}`);
       }
 if (!isNaN(dt.getTime())) {
+  let addr = "";
+  if (idxAddr >= 0 && r[idxAddr] != null) {
+    addr = String(r[idxAddr]).trim();
+    if (addr.toLowerCase() === "null" || addr === "undefined") addr = "";
+  }
   z3Events.push({
     time: dt,
     label: String(label),
-    address: idxAddr >= 0 ? String(r[idxAddr]) : ""
+    address: addr
   });
 }
+
 
     });
 
