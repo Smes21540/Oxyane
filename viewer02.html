@@ -207,24 +207,33 @@
   let baseFileName="", baseFileId="", headers=[], timeField="", baseDateYYYYMMDD="";
   let colors=[]; let themeMenuTimer;
   let loadedDays=new Set(); let saMeta=null;
+  let customColors = {}; // mémorise les couleurs choisies par label
+
 
   // Z3
   let z3Events = []; // {time: Date, label: string}
   let z3Visible = false;
 
   /* ===================== THEME ===================== */
-  function applyThemeVars(vars){
-    const r=document.documentElement;
-    Object.entries(vars).forEach(([k,v])=>r.style.setProperty(k,v));
-    colors = buildPalette();
-    if(chart){
-      chart.data.datasets.forEach((ds,i)=>{
-        const c=colors[i%colors.length];
-        ds.borderColor=c; ds.pointBackgroundColor=c; ds.pointBorderColor=c;
-      });
-      chart.update('none');
-    }
+function applyThemeVars(vars){
+  const r=document.documentElement;
+  Object.entries(vars).forEach(([k,v])=>r.style.setProperty(k,v));
+  colors = buildPalette();
+  if(chart){
+    chart.data.datasets.forEach((ds,i)=>{
+      const baseLabel = ds.label.replace(" (lissé)", "");
+      const saved = customColors[baseLabel];
+      const c = saved || colors[i % colors.length];
+      ds.borderColor = c;
+      ds.backgroundColor = c;
+      ds.pointBackgroundColor = c;
+      ds.pointBorderColor = c;
+    });
+    chart.update('none');
   }
+}
+
+  
   function setTheme(theme){
     localStorage.setItem("selectedTheme",theme);
     if(theme==="orange") applyThemeVars({"--accent":"#ff7043","--accent-darker":"#e64a19","--accent-muted":"#ffccbc","--bg":"#fff5f5","--panel":"#ffffff","--danger":"#d84315","--text":"#333"});
@@ -405,18 +414,23 @@
       // valeurs affichées
       if (smooth) pts = movingAverage(pts, 10);
 
-      const c = colors[i%colors.length];
-      return {
-        label: yCol + (smooth ? " (lissé)" : ""),
-        data: pts,
-        borderColor: c,
-        borderWidth: 2,
-        fill: false,
-        tension: 0,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointHitRadius: 8
-      };
+const baseLabel = yCol; // la "clé" toujours sans (lissé)
+const savedColor = customColors[baseLabel];
+const c = savedColor || colors[i % colors.length];
+
+return {
+  label: baseLabel + (smooth ? " (lissé)" : ""),
+  data: pts,
+  borderColor: c,
+  backgroundColor: c,
+  borderWidth: 2,
+  fill: false,
+  tension: 0,
+  pointRadius: 0,
+  pointHoverRadius: 5,
+  pointHitRadius: 8
+};
+
     });
   }
 
@@ -621,8 +635,15 @@ if (!isNaN(dt.getTime())) {
 
   const datasets = buildDatasets();
 
-  if(chart) chart.destroy();
-  chart=new Chart(ctx,{
+// Sauvegarder zoom avant destruction
+let prevMin=null, prevMax=null;
+if(chart){
+  prevMin = chart.scales.x.min;
+  prevMax = chart.scales.x.max;
+  chart.destroy();
+}
+chart=new Chart(ctx,{
+
     type:'line',
     data:{datasets},
     options:{
@@ -630,32 +651,58 @@ if (!isNaN(dt.getTime())) {
       maintainAspectRatio:false,
       parsing:false,
       interaction:{mode:'nearest',axis:'x',intersect:false},
-      plugins:{
-        legend:{position:'top'},
-        datalabels:{display:false},
-        zoom:{
-          zoom:{
-            wheel:{enabled:true,modifierKey:'ctrl'},
-            pinch:{enabled:true},
-            drag:{enabled:true, mode:'x'}
-          },
-          pan:{enabled:true,mode:'x'}
-        },
-        tooltip:{
-          callbacks:{
-            title:(items)=>{
-              if(!items?.length) return '';
-              const d=new Date(items[0].parsed.x);
-              return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-            }
-          }
-        }
-      },
+plugins:{
+  legend:{
+    position:'top',
+    labels:{
+      usePointStyle:true,          // affiche un symbole au lieu du trait
+      pointStyle:'rect',           // carré plein
+      color:getCSSVar('--text')    // couleur du texte
+    },
+onClick:(e,legendItem)=>{      // clic sur carré = changer couleur
+  const datasetIndex = legendItem.datasetIndex;
+  const ds = chart.data.datasets[datasetIndex];
+  const baseLabel = ds.label.replace(" (lissé)", ""); // clé stable
+  const picker = document.getElementById('colorPicker');
+  picker.oninput = (ev)=>{
+    const newColor = ev.target.value;
+    customColors[baseLabel] = newColor;  // 🔑 on sauvegarde !
+    ds.borderColor = newColor;
+    ds.backgroundColor = newColor;       // carré de légende rempli
+    ds.pointBackgroundColor = newColor;
+    ds.pointBorderColor = newColor;
+    chart.update('none');
+  };
+  picker.click();
+}
+
+  },
+  datalabels:{display:false},
+  zoom:{
+    zoom:{
+      wheel:{enabled:true,modifierKey:'ctrl'},
+      pinch:{enabled:true},
+      drag:{enabled:true, mode:'x'}
+    },
+    pan:{enabled:true,mode:'x'}
+  },
+  tooltip:{
+    callbacks:{
+      title:(items)=>{
+        if(!items?.length) return '';
+        const d=new Date(items[0].parsed.x);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+    }
+  }
+}
+,
       scales:{
         x:{
           type:'time',
-          min:Number.isFinite(minX)?minX:undefined,
-          max:Number.isFinite(maxX)?maxX:undefined,
+min: prevMin ?? (Number.isFinite(minX)?minX:undefined),
+max: prevMax ?? (Number.isFinite(maxX)?maxX:undefined),
+
           time:{unit:'hour',tooltipFormat:'HH:mm',displayFormats:{hour:'HH:mm',minute:'HH:mm'}},
           ticks:{autoSkip:true,callback:(value)=>{
             const d=new Date(value);
@@ -711,9 +758,14 @@ if (!isNaN(dt.getTime())) {
     colorPickerEl.oninput = (e)=>{
       const newColor = e.target.value;
       const ds = chart.data.datasets[datasetIndex];
-      ds.borderColor = newColor;
-      ds.pointBackgroundColor = newColor;
-      ds.pointBorderColor = newColor;
+const baseLabel = ds.label.replace(" (lissé)", "");
+customColors[baseLabel] = newColor;
+ // mémorise par label
+ds.borderColor = newColor;
+ds.backgroundColor = newColor;
+ds.pointBackgroundColor = newColor;
+ds.pointBorderColor = newColor;
+
       chart.update('none');
     };
     // ouvrir le color picker
@@ -916,7 +968,7 @@ if (!isNaN(dt.getTime())) {
     z3Visible = false;
     const btn = document.getElementById('toggleZ3');
     if (btn.style.display !== 'none') {
-      btn.textContent = '🚨 Événements Z3 OFF';
+      btn.textContent = '🚨 Événements OFF';
     }
 
     // aide zoom temporaire
@@ -937,3 +989,4 @@ if (!isNaN(dt.getTime())) {
   </script>
 </body>
 </html>
+
