@@ -8,7 +8,7 @@
 
   <!-- Librairies -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -626,7 +626,7 @@ if (!isNaN(dt.getTime())) {
     return true;
   }
 
-  function drawChart(){
+ function drawChart(){
   if(!csvData.length||!timeField||!currentY.length) return;
   const ctx=document.getElementById('myChart').getContext('2d');
 
@@ -635,15 +635,15 @@ if (!isNaN(dt.getTime())) {
 
   const datasets = buildDatasets();
 
-// Sauvegarder zoom avant destruction
-let prevMin=null, prevMax=null;
-if(chart){
-  prevMin = chart.scales.x.min;
-  prevMax = chart.scales.x.max;
-  chart.destroy();
-}
-chart=new Chart(ctx,{
+  // Sauvegarder zoom avant destruction
+  let prevMin=null, prevMax=null;
+  if(chart){
+    prevMin = chart.scales.x.min;
+    prevMax = chart.scales.x.max;
+    chart.destroy();
+  }
 
+  chart=new Chart(ctx,{
     type:'line',
     data:{datasets},
     options:{
@@ -651,63 +651,69 @@ chart=new Chart(ctx,{
       maintainAspectRatio:false,
       parsing:false,
       interaction:{mode:'nearest',axis:'x',intersect:false},
-plugins:{
-  legend:{
-    position:'top',
-    labels:{
-      usePointStyle:true,          // affiche un symbole au lieu du trait
-      pointStyle:'rect',           // carré plein
-      color:getCSSVar('--text')    // couleur du texte
-    },
-onClick:(e,legendItem)=>{      // clic sur carré = changer couleur
-  const datasetIndex = legendItem.datasetIndex;
-  const ds = chart.data.datasets[datasetIndex];
-  const baseLabel = ds.label.replace(" (lissé)", ""); // clé stable
-  const picker = document.getElementById('colorPicker');
-  picker.oninput = (ev)=>{
-    const newColor = ev.target.value;
-    customColors[baseLabel] = newColor;  // 🔑 on sauvegarde !
-    ds.borderColor = newColor;
-    ds.backgroundColor = newColor;       // carré de légende rempli
-    ds.pointBackgroundColor = newColor;
-    ds.pointBorderColor = newColor;
-    chart.update('none');
-  };
-  picker.click();
-}
-
-  },
-  datalabels:{display:false},
-  zoom:{
-    zoom:{
-      wheel:{enabled:true,modifierKey:'ctrl'},
-      pinch:{enabled:true},
-      drag:{enabled:true, mode:'x'}
-    },
-    pan:{enabled:true,mode:'x'}
-  },
-  tooltip:{
-    callbacks:{
-      title:(items)=>{
-        if(!items?.length) return '';
-        const d=new Date(items[0].parsed.x);
-        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-      }
-    }
-  }
-}
-,
+      plugins:{
+        legend:{
+          position:'top',
+          labels:{
+            usePointStyle:true,
+            pointStyle:'rect',
+            color:getCSSVar('--text')
+          },
+          onClick:(e,legendItem)=>{
+            const datasetIndex = legendItem.datasetIndex;
+            const ds = chart.data.datasets[datasetIndex];
+            const baseLabel = ds.label.replace(" (lissé)", "");
+            const picker = document.getElementById('colorPicker');
+            picker.oninput = (ev)=>{
+              const newColor = ev.target.value;
+              customColors[baseLabel] = newColor;
+              ds.borderColor = newColor;
+              ds.backgroundColor = newColor;
+              ds.pointBackgroundColor = newColor;
+              ds.pointBorderColor = newColor;
+              chart.update('none');
+            };
+            picker.click();
+          }
+        },
+        datalabels:{display:false},
+        zoom:{
+          zoom:{
+            wheel:{enabled:true,modifierKey:'ctrl'},
+            pinch:{enabled:true},
+            drag:{enabled:true,mode:'x'},
+            mode:'x'
+          },
+          pan:{enabled:true,mode:'x'},
+          limits:{ y:{min:'original',max:'original'} }
+        }
+      },
+      tooltip:{   // au bon niveau
+        callbacks:{
+          title:(items)=>{
+            if(!items?.length) return '';
+            const d=new Date(items[0].parsed.x);
+            return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+          }
+        }
+      },
       scales:{
         x:{
           type:'time',
-min: prevMin ?? (Number.isFinite(minX)?minX:undefined),
-max: prevMax ?? (Number.isFinite(maxX)?maxX:undefined),
-
-          time:{unit:'hour',tooltipFormat:'HH:mm',displayFormats:{hour:'HH:mm',minute:'HH:mm'}},
-          ticks:{autoSkip:true,callback:(value)=>{
-            const d=new Date(value);
-            return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-          }}
+          min: prevMin ?? (Number.isFinite(minX)?minX:undefined),
+          max: prevMax ?? (Number.isFinite(maxX)?maxX:undefined),
+          time:{
+            unit:'hour',
+            tooltipFormat:'HH:mm',
+            displayFormats:{hour:'HH:mm',minute:'HH:mm'}
+          },
+          ticks:{
+            autoSkip:true,
+            callback:(value)=>{
+              const d=new Date(value);
+              return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            }
+          }
         },
         y:{title:{display:true,text:'Valeurs'}}
       }
@@ -715,8 +721,22 @@ max: prevMax ?? (Number.isFinite(maxX)?maxX:undefined),
     plugins:[ChartDataLabels,dayBackgroundPlugin,z3LinesPlugin]
   });
 
-  // === AJOUT ICI ===
+  // === Tous les listeners regroupés ===
   const canvas = chart.canvas;
+
+  // auto-load jours au zoom/dézoom/pan
+  canvas.addEventListener('wheel', async (e)=>{
+    if (e.ctrlKey) {
+      console.log("Détection zoom molette+Ctrl");
+      await autoLoadDays(chart);
+    }
+  });
+  canvas.addEventListener('mouseup', async ()=>{
+    console.log("Détection fin zoom/pan drag");
+    await autoLoadDays(chart);
+  });
+
+  // gestion survol Z3
   canvas.addEventListener('mousemove', (e)=>{
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -728,11 +748,11 @@ max: prevMax ?? (Number.isFinite(maxX)?maxX:undefined),
     chart.$z3Mouse = null;
     chart.update('none');
   });
-  // === FIN AJOUT ===
 
   chart.update();
   applyAdaptiveTicks();
 }
+
 
 
   /* ===================== UI ===================== */
@@ -804,18 +824,84 @@ ds.pointBorderColor = newColor;
     if (chart) chart.update('none');
   };
 
-  /* ===================== EXTEND / PAN ===================== */
-  async function loadDayIfAvailable(yyyymmdd){
-    if(loadedDays.has(yyyymmdd)) return true;
-    const list=JSON.parse(localStorage.getItem("csvFilesList")||"[]");
-    if(!saMeta) return false;
-    const name=`SA${saMeta.num}_${yyyymmdd}.csv`;
-    const f=list.find(x=>x.name===name);
-    if(!f) return false;
-    const parsed=await loadCSVByFileId(f.id); if(!parsed) return false;
-    const rows=buildObjectsFromParsedResults(parsed,headers); enrichRowsWithDate(rows,yyyymmdd);
-    csvData=csvData.concat(rows); loadedDays.add(yyyymmdd); return true;
+/* ===================== EXTEND / PAN ===================== */
+async function loadDayIfAvailable(yyyymmdd){
+  if(loadedDays.has(yyyymmdd)) return true;
+
+  const list = JSON.parse(localStorage.getItem("csvFilesList") || "[]");
+  if(!saMeta) return false;
+
+  // === CSV principal (SA) ===
+  const name=`SA${saMeta.num}_${yyyymmdd}.csv`;
+  const f=list.find(x=>x.name===name);
+  if(f){
+    const parsed=await loadCSVByFileId(f.id);
+    if(parsed){
+      const rows=buildObjectsFromParsedResults(parsed,headers);
+      enrichRowsWithDate(rows,yyyymmdd);
+      csvData=csvData.concat(rows);
+      loadedDays.add(yyyymmdd);
+    }
   }
+
+  // === CSV événements Z3 associé ===
+  const nameZ = `Z3${saMeta.num}_${yyyymmdd}.csv`;
+  const fz = list.find(x => String(x.name||"").toLowerCase() === nameZ.toLowerCase());
+  if(fz){
+    const parsedZ = await loadCSVByFileId(fz.id);
+    if(parsedZ && parsedZ.data && parsedZ.data.length > 1){
+      let headerRowIdx = 0;
+      for (let i=0;i<Math.min(5, parsedZ.data.length);i++){
+        const row = parsedZ.data[i] || [];
+        const joined = row.map(v => String(v||'')).join('|').toLowerCase();
+        if (joined.includes('trigger') && (joined.includes('time') || joined.includes('date'))) {
+          headerRowIdx = i;
+          break;
+        }
+      }
+      const headersZ = parsedZ.data[headerRowIdx];
+      const rowsZ = parsedZ.data.slice(headerRowIdx+1);
+
+      const idxDate = headersZ.findIndex(h => String(h||'').toLowerCase().includes('date'));
+      const idxTime = headersZ.findIndex(h => String(h||'').toLowerCase().includes('time'));
+      let idxMsg  = headersZ.findIndex(h => String(h||'').toLowerCase().includes('message'));
+      if (idxMsg === -1) idxMsg = headersZ.findIndex(h => String(h||'').toLowerCase().includes('event'));
+      const idxAddr = headersZ.findIndex(h => String(h||'').toLowerCase().includes('address'));
+
+      rowsZ.forEach(r=>{
+        const dateStr = r[idxDate], timeStr = r[idxTime];
+        if(!dateStr || !timeStr) return;
+        let dt;
+        if (typeof dateStr === 'string' && dateStr.includes('/')){
+          const [d,m,y] = String(dateStr).split('/');
+          const iso = `20${y}-${m}-${d}T${String(timeStr)}`;
+          dt = new Date(iso);
+        }else{
+          dt = new Date(`${String(dateStr)}T${String(timeStr)}`);
+        }
+        if(!isNaN(dt.getTime())){
+          let addr = "";
+          if(idxAddr>=0 && r[idxAddr]!=null){
+            addr = String(r[idxAddr]).trim();
+            if(addr.toLowerCase()==="null"||addr==="undefined") addr="";
+          }
+          z3Events.push({
+            time: dt,
+            label: String(r[idxMsg]||'Événement'),
+            address: addr
+          });
+        }
+      });
+
+      // Afficher le bouton Z3 si dispo
+      const btn=document.getElementById('toggleZ3');
+      btn.style.display='inline-block';
+    }
+  }
+
+  return true;
+}
+
 
   async function panAndLoad(direction){
     if(!chart || !saMeta) return;
@@ -879,6 +965,55 @@ ds.pointBorderColor = newColor;
   };
   document.getElementById('extendPrev').onclick=async()=>{ const res=await openDayModal(1,-1); if(res&&res.n>0) extendDays(-1,res.n); };
   document.getElementById('extendNext').onclick=async()=>{ const res=await openDayModal(1,+1); if(res&&res.n>0) extendDays(+1,res.n); };
+
+/* ===================== AUTO LOAD DAYS (zoom/pan) ===================== */
+async function autoLoadDays(chart){
+  if(!saMeta) return;
+  const xScale = chart.scales.x;
+  const min = xScale.min, max = xScale.max;
+
+  const d0 = new Date(min);
+  const d1 = new Date(max);
+
+  // Mise à zéro heure
+  d0.setHours(0,0,0,0);
+  d1.setHours(0,0,0,0);
+
+  // 🔥 inclure la veille et le lendemain
+  d0.setDate(d0.getDate()-1);
+  d1.setDate(d1.getDate()+1);
+
+  let newData = false;
+
+  for(let d=new Date(d0); d<=d1; d.setDate(d.getDate()+1)){
+    const ymd = d.getFullYear()
+                + String(d.getMonth()+1).padStart(2,"0")
+                + String(d.getDate()).padStart(2,"0");
+    console.log("Tentative chargement", ymd);
+    const loaded = await loadDayIfAvailable(ymd);
+    if (loaded) {
+      console.log("✅ Jour chargé", ymd);
+      newData = true;
+    }
+  }
+
+  if(newData){
+    // Trier toutes les données CSV
+    csvData.sort((a,b)=>(a.__sortKey||0)-(b.__sortKey||0));
+
+    // Recharger les datasets visibles
+    if(currentY.length){
+      chart.data.datasets = buildDatasets();
+      chart.update('none');
+      applyAdaptiveTicks();
+    }
+
+    // 🔔 Recharger les événements Z3 liés
+    await loadZ3IfAvailable();
+    if(z3Visible && chart) chart.update('none');
+  }
+}
+
 
   /* ===================== EXPORT PDF ===================== */
   document.getElementById('exportPDF').onclick = () => {
@@ -989,4 +1124,5 @@ ds.pointBorderColor = newColor;
   </script>
 </body>
 </html>
+
 
