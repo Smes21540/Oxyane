@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -190,19 +192,47 @@
   align-items: center;     /* centre horizontalement */
 }
 
+    #currentFolderName {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      font-size: 28px;           /* assez gros */
+      font-weight: bold;
+      color: var(--accent);      /* couleur du thème */
+      white-space: nowrap;
+      max-width: 500px;          /* limite largeur */
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+/* Effet flamme animée */
+.flame {
+  display: inline-block;
+  animation: flicker 1s infinite alternate;
+}
+@keyframes flicker {
+  0%   { transform: scale(1) rotate(0deg); opacity: 1; }
+  25%  { transform: scale(1.1) rotate(-5deg); opacity: 0.9; }
+  50%  { transform: scale(0.9) rotate(5deg); opacity: 0.8; }
+  75%  { transform: scale(1.05) rotate(-3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
+}
+
 
 
   </style>
 </head>
 <body>
   <!-- === PARTIE 3 : Header === -->
-  <div class="header">
-    <img src="img/logo.png" alt="Logo" class="logo" />
-    <div id="fileNameContainer">
-      <div id="fileName"></div>
-      <div id="lineCount"></div>
-    </div>
+<div class="header">
+  <div id="currentFolderName"></div> <!-- 💡 nouveau bloc pour le dossier -->
+  <img src="img/logo.png" alt="Logo" class="logo" />
+  <div id="fileNameContainer">
+    <div id="fileName"></div>
+    <div id="lineCount"></div>
   </div>
+</div>
+
 
   <!-- === PARTIE 4 : Contrôles === -->
   <div class="controls">
@@ -381,58 +411,100 @@ function applyThemeVars(vars){
   }
 
   /* ===================== LOAD CSV (base) ===================== */
-  async function loadCSVFromDrive(){
-    baseFileId=getParam('fileId'); baseFileName=decodeURIComponent(getParam('fileName')||'');
-    if(!baseFileId){showError();return;}
-    document.getElementById('fileName').textContent=baseFileName;
-    document.getElementById('fileName').style.display="block";
-    document.getElementById('lineCount').style.display="block";
-    document.getElementById('exportPDF').style.display="inline-block";
-    document.getElementById('resetZoom').style.display="inline-block";
+async function loadCSVFromDrive(){
+  baseFileId = getParam('fileId'); 
+  baseFileName = decodeURIComponent(getParam('fileName')||'');
+  if(!baseFileId){showError();return;}
 
-    const parsed=await loadCSVByFileId(baseFileId); if(!parsed) return;
-    headers=dedupeHeaders(parsed.data[0]||[]);
-    csvData=buildObjectsFromParsedResults(parsed,headers);
-    document.getElementById('lineCount').textContent=csvData.length+" ligne"+(csvData.length>1?"s":"");
+  document.getElementById('fileName').textContent = baseFileName;
+  document.getElementById('fileName').style.display = "block";
+  document.getElementById('lineCount').style.display = "block";
+  document.getElementById('exportPDF').style.display = "inline-block";
+  document.getElementById('resetZoom').style.display = "inline-block";
 
-    const xSel=document.getElementById('xColumn');
-    xSel.innerHTML="";
+// 💡 afficher dossier courant + parent racine (si dispo) sans appel API
+try {
+  const list = JSON.parse(localStorage.getItem("csvFilesList") || "[]");
+  const f = list.find(x => x.id === baseFileId);
 
-    // vide et reconstruit le conteneur Y
-    const yContainer = document.getElementById("yColumnsContainer");
-    yContainer.innerHTML="";
+  if (f) {
+    let title = "";
 
-    let defX=headers.find(h=>h.toLowerCase().includes("time")||h.toLowerCase()==="heure");
+    // nom du dossier parent direct (si présent dans la liste)
+    if (f.parents && f.parents.length) {
+      const parent = list.find(x => x.id === f.parents[0]);
+      if (parent && parent.name) {
+        title = parent.name;
 
-    headers.forEach((f,i)=>{
-      // X : on ajoute toutes les colonnes
-      const ox=document.createElement("option");
-      ox.value=f; ox.text=f;
-      xSel.appendChild(ox);
-
-      // Y : on saute la colonne temps
-      if(f===defX||/time|date|jour/.test(f.toLowerCase())) return;
-
-      const label = document.createElement("label");
-      label.innerHTML = `<input type="checkbox" value="${f}"> ${f}`;
-      yContainer.appendChild(label);
-    });
-
-    document.getElementById('columnSelectors').style.display="flex";
-
-    if(defX){
-      xSel.value=defX;
-      xSel.style.display="none";
-      timeField=defX;
+        // chercher le parent du parent
+        if (parent.parents && parent.parents.length) {
+          const root = list.find(x => x.id === parent.parents[0]);
+          if (root && root.name) {
+            title = root.name + " / " + parent.name;
+          }
+        }
+      }
     }
 
-    saMeta=parseSAFileName(baseFileName);
-    if(saMeta){
-      baseDateYYYYMMDD=saMeta.date;
-      enrichRowsWithDate(csvData,baseDateYYYYMMDD);
-      loadedDays.add(baseDateYYYYMMDD);
-    }
+// fallback : si aucun dossier trouvé, afficher au moins le nom du fichier
+if (!title) title = baseFileName;
+
+// 🔥 transformer les flammes en span animé
+const flameTitle = title.replace(/🔥/g, '<span class="flame">🔥</span>');
+document.getElementById("currentFolderName").innerHTML = flameTitle;
+
   }
+} catch(e) {
+  console.warn("Impossible de récupérer le titre dossier", e);
+}
+
+
+
+  const parsed = await loadCSVByFileId(baseFileId); 
+  if(!parsed) return;
+  headers = dedupeHeaders(parsed.data[0]||[]);
+  csvData = buildObjectsFromParsedResults(parsed,headers);
+  document.getElementById('lineCount').textContent = csvData.length+" ligne"+(csvData.length>1?"s":"");
+
+  const xSel = document.getElementById('xColumn');
+  xSel.innerHTML = "";
+
+  // vide et reconstruit le conteneur Y
+  const yContainer = document.getElementById("yColumnsContainer");
+  yContainer.innerHTML = "";
+
+  let defX = headers.find(h=>h.toLowerCase().includes("time")||h.toLowerCase()==="heure");
+
+  headers.forEach((f,i)=>{
+    // X : on ajoute toutes les colonnes
+    const ox = document.createElement("option");
+    ox.value = f; ox.text = f;
+    xSel.appendChild(ox);
+
+    // Y : on saute la colonne temps
+    if(f===defX || /time|date|jour/.test(f.toLowerCase())) return;
+
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="checkbox" value="${f}"> ${f}`;
+    yContainer.appendChild(label);
+  });
+
+  document.getElementById('columnSelectors').style.display = "flex";
+
+  if(defX){
+    xSel.value = defX;
+    xSel.style.display = "none";
+    timeField = defX;
+  }
+
+  saMeta = parseSAFileName(baseFileName);
+  if(saMeta){
+    baseDateYYYYMMDD = saMeta.date;
+    enrichRowsWithDate(csvData,baseDateYYYYMMDD);
+    loadedDays.add(baseDateYYYYMMDD);
+  }
+}
+
 
   /* ===================== CHART ===================== */
   function getTimeUnit(range){
@@ -531,103 +603,108 @@ return {
     }
   };
 
-// Plugin lignes Z3 avec tooltip stylé (heure + message + address, traits noirs pointillés)
+// Plugin lignes Z3 : traits fins pleins, gras au survol
 const z3LinesPlugin = {
   id: 'z3Lines',
-  afterDatasetsDraw(chartArg){
-    if(!z3Visible || !z3Events.length) return;
+  afterDatasetsDraw(chartArg) {
+    if (!z3Visible || !z3Events.length) return;
     const xScale = chartArg.scales.x;
     const { top, bottom } = chartArg.chartArea;
     const ctx = chartArg.ctx;
     ctx.save();
-    ctx.strokeStyle = 'black';
-    ctx.setLineDash([5,5]); // pointillé
-    ctx.lineWidth = 1;
 
-    // dessiner les lignes
-    z3Events.forEach(ev => {
-      const x = xScale.getPixelForValue(ev.time.getTime());
-      if (x >= xScale.left && x <= xScale.right) {
-        ctx.beginPath();
-        ctx.moveTo(x, top);
-        ctx.lineTo(x, bottom);
-        ctx.stroke();
-      }
-    });
-
-    // gestion survol → tooltip
+    // Gestion survol souris → trouver la ligne la plus proche
     const mouse = chartArg.$z3Mouse;
-    if(mouse){
-      let nearest = null, dist = Infinity;
-      z3Events.forEach(ev=>{
+    let nearest = null;
+    let dist = Infinity;
+
+    if (mouse) {
+      z3Events.forEach(ev => {
         const x = xScale.getPixelForValue(ev.time.getTime());
         const d = Math.abs(mouse.x - x);
-        if(d < 6 && d < dist){
-          nearest = {ev,x};
-          dist=d;
+        if (d < dist) {
+          nearest = { ev, x };
+          dist = d;
         }
       });
-      if(nearest){
-        const {ev,x} = nearest;
-        const tooltipY = top + 25;
+      if (dist > 6) nearest = null; // seuil max
+    }
 
-        // Texte : heure + message + adresse
-        const h = String(ev.time.getHours()).padStart(2,'0')+":"+
-                  String(ev.time.getMinutes()).padStart(2,'0');
-        const line1 = `⏰ ${h}`;
-        const line2 = ev.label;
-        const line3 = ev.address ? `📍 ${ev.address}` : "";
-        ctx.font = '12px sans-serif';
-        const w = Math.max(
-          ctx.measureText(line1).width,
-          ctx.measureText(line2).width,
-          ctx.measureText(line3).width
-        ) + 14;
+    // Dessiner toutes les lignes
+    z3Events.forEach(ev => {
+      const x = xScale.getPixelForValue(ev.time.getTime());
+      if (x < xScale.left || x > xScale.right) return;
 
-        // Style basé sur le thème
-        const panel = getCSSVar('--panel') || '#fff';
-        const accent = getCSSVar('--accent') || 'black';
-
-        ctx.fillStyle = panel;
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 1;
-        ctx.shadowColor = 'rgba(0,0,0,0.25)';
-        ctx.shadowBlur = 4;
-
-        // boîte arrondie
-        const boxX = x - w/2;
-        const boxY = tooltipY - 20;
-        const boxH = line3 ? 48 : 36;
-        const r = 6;
-        ctx.beginPath();
-        ctx.moveTo(boxX+r, boxY);
-        ctx.lineTo(boxX+w-r, boxY);
-        ctx.quadraticCurveTo(boxX+w, boxY, boxX+w, boxY+r);
-        ctx.lineTo(boxX+w, boxY+boxH-r);
-        ctx.quadraticCurveTo(boxX+w, boxY+boxH, boxX+w-r, boxY+boxH);
-        ctx.lineTo(boxX+r, boxY+boxH);
-        ctx.quadraticCurveTo(boxX, boxY+boxH, boxX, boxY+boxH-r);
-        ctx.lineTo(boxX, boxY+r);
-        ctx.quadraticCurveTo(boxX, boxY, boxX+r, boxY);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Texte
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = accent;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(line1, x, boxY + 10);
-        ctx.fillText(line2, x, boxY + 25);
-        if(line3) ctx.fillText(line3, x, boxY + 40);
+      let color = '#003366';
+      const label = ev.label.toLowerCase();
+      if (label.includes('défaut') || label.includes('defaut') || 
+          label.includes('arrêt')  || label.includes('arret')) {
+        color = 'red';
+      } else if (label.includes('démarrage')) {
+        color = 'green';
       }
+
+      const isHovered = nearest && nearest.ev === ev;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isHovered ? 3 : 0.5; // épaisseur dynamique
+
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+    });
+
+    // Tooltip uniquement sur la ligne survolée
+    if (nearest) {
+      const { ev, x } = nearest;
+      const tooltipY = top + 25;
+      const h = String(ev.time.getHours()).padStart(2,'0')+":"+String(ev.time.getMinutes()).padStart(2,'0');
+      const line1 = `⏰ ${h}`;
+      const line2 = ev.label;
+      const line3 = ev.address ? `📍 ${ev.address}` : "";
+      ctx.font = '12px sans-serif';
+      const w = Math.max(
+        ctx.measureText(line1).width,
+        ctx.measureText(line2).width,
+        ctx.measureText(line3).width
+      ) + 14;
+      const panel = getCSSVar('--panel') || '#fff';
+      const accent = getCSSVar('--accent') || 'black';
+      ctx.fillStyle = panel;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = 4;
+      const boxX = x - w/2;
+      const boxY = tooltipY - 20;
+      const boxH = line3 ? 48 : 36;
+      const r = 6;
+      ctx.beginPath();
+      ctx.moveTo(boxX+r, boxY);
+      ctx.lineTo(boxX+w-r, boxY);
+      ctx.quadraticCurveTo(boxX+w, boxY, boxX+w, boxY+r);
+      ctx.lineTo(boxX+w, boxY+boxH-r);
+      ctx.quadraticCurveTo(boxX+w, boxY+boxH, boxX+w-r, boxY+boxH);
+      ctx.lineTo(boxX+r, boxY+boxH);
+      ctx.quadraticCurveTo(boxX, boxY+boxH, boxX, boxY+boxH-r);
+      ctx.lineTo(boxX, boxY+r);
+      ctx.quadraticCurveTo(boxX, boxY, boxX+r, boxY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = accent;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(line1, x, boxY + 10);
+      ctx.fillText(line2, x, boxY + 25);
+      if(line3) ctx.fillText(line3, x, boxY + 40);
     }
 
     ctx.restore();
-    ctx.setLineDash([]); // reset style
   }
 };
+
 
 
   async function loadZ3IfAvailable(){
@@ -1212,8 +1289,3 @@ async function autoLoadDays(chart){
   </script>
 </body>
 </html>
-
-
-
-
-
