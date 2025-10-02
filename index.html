@@ -1,22 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-YG4RV4W27S"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-YG4RV4W27S');
-</script>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Explorateur données séchoirs</title>
-
-<!-- Dépendances -->
-<script src="libs/jszip.min.js"></script>
-<script src="libs/FileSaver.min.js"></script>
-
+<title>Traçabilité Séchoir</title>
 <style>
 :root{
   --bg:#fff5f5;
@@ -25,270 +12,133 @@
   --text:#333;
   --muted-text:#555;
   --shadow:rgba(0,0,0,0.1);
-  --overlay:rgba(0,0,0,0.8);
-  --table-border:#eee;
-  --thumb-border:#ccc;
-
-  /* Thème (orange par défaut) */
   --accent:#ff7043;
-  --accent-contrast:#fff;
   --accent-darker:#e64a19;
   --accent-muted:#ffccbc;
   --danger:#d84315;
-
-  /* Couleurs des lignes du tableau */
-  --row-even:#ffe5d9;
-  --row-odd:#fff5f5;
 }
 
-*{box-sizing:border-box}
-
+html,body{height:100%;margin:0;overflow:hidden;}
 body{
-  font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;
-  background:var(--bg);color:var(--text);margin:0;padding:0;
-  display:flex;height:100vh;overflow:hidden;
+  font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color:var(--bg);
+  padding:5px 20px 7px 20px;
+  color:var(--danger);
+  font-size:14px;
+  display:flex; flex-direction:column;
 }
 
-/* Alerte réseau */
-#netAlert{
-  display:none;position:fixed;top:0;left:0;right:0;z-index:3000;
-  background:var(--accent-muted);color:var(--danger);
-  padding:8px;text-align:center;font-weight:bold;
-}
-
-/* Sidebar */
-#sidebar{
-  background:var(--sidebar-bg);border-right:2px solid var(--accent);
-  padding:20px 10px;overflow-y:auto;z-index:1000;
-  width:auto;min-width:200px;max-width:500px;
-}
-#sidebar h2{
-  color:var(--accent);font-size:18px;font-weight:bold;text-transform:uppercase;
-  margin:0 0 12px 0;padding-left:5px;display:flex;align-items:center;gap:6px;
-}
-#folderTree ul{list-style:none;padding-left:20px;margin:0;}
-#folderTree li{cursor:pointer;margin:5px 0;}
-.folder-toggle{font-weight:bold;margin-right:5px;cursor:pointer;color:var(--accent);}
-.folder-name{cursor:pointer;}
-.active-folder{background:var(--accent-muted);border-radius:3px;padding:2px 4px;}
-
-/* Main */
-#main{flex:1;padding:10px 20px;display:flex;flex-direction:column;overflow:hidden;}
-.header{display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:15px;}
-.header .logo{height:60px;width:auto;}
-#fileNameContainer{position:absolute;right:0;top:0;text-align:right;}
+/* Header */
+.header{position:relative; display:flex; align-items:center; justify-content:center; margin:0 0 10px 0;}
+.header .logo{height:60px; width:auto;}
+#fileNameContainer{position:absolute; right:0; top:0; text-align:right;}
 #fileName,#lineCount{color:var(--danger);}
-#fileName{font-size:20px;font-weight:bold;white-space:nowrap;max-width:250px;overflow:hidden;text-overflow:ellipsis;display:none;}
-#lineCount{font-size:12px;display:none;}
+#fileName{font-size:24px; font-weight:bold; white-space:nowrap; max-width:300px; overflow:hidden; text-overflow:ellipsis; display:none;}
+#lineCount{font-size:12px; display:none;}
 
-/* Contrôles */
-.controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;align-items:center;}
-.controls button{
-  background:var(--accent);color:var(--accent-contrast);
-  border:none;cursor:pointer;font-weight:bold;
-  padding:6px 12px;border-radius:6px;font-size:13px;transition:0.3s;
-}
-.controls button:hover{background:var(--accent-darker);transform:scale(1.05);}
+/* Controls */
+.controls{display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:5px 0;}
+button{background-color:var(--accent); color:#fff; border:none; cursor:pointer; font-weight:bold; padding:8px 12px; border-radius:6px; font-size:13px; transition:background-color .3s ease, transform .2s ease;}
+button:hover{background-color:var(--accent-darker); transform:scale(1.05);}
+button:disabled{background-color:#ccc; color:#666; cursor:not-allowed; transform:none;}
+#toggleColumnsBtn{padding:6px 10px; border-radius:6px; border:1px solid var(--accent-darker); background-color:var(--accent); color:#fff; cursor:pointer; font-size:13px;}
+#toggleColumnsBtn:hover{background-color:var(--accent-darker);}
 
-/* Champs date + icône custom */
-.date-field{
-  display:flex;align-items:center;gap:6px;background:var(--panel);
-  border:2px solid var(--table-border);border-radius:6px;padding:4px 8px;
+/* Table wrapper centered */
+#tableWrapper{
+  flex:1;
+  overflow:auto;               /* scroll si nécessaire */
+  display:flex;
+  justify-content:center;      /* centre horizontalement */
+  align-items:center;          /* centre verticalement */
+  padding:10px;
 }
-.date-field span{font-size:16px;color:var(--accent);cursor:pointer;user-select:none;transition:0.2s;}
-.date-field span:hover{transform:scale(1.2);}
-.date-field input[type=date]{border:none;outline:none;background:transparent;font-size:14px;color:var(--text);padding:6px 2px;}
-input[type="date"]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none;}
-.date-field input[type=date]:focus {box-shadow:0 0 6px var(--accent);border-color:var(--accent);color:var(--danger);}
-
-/* Tableau */
-#tableWrapper{flex:1;overflow:auto;}
-#tableContainer{overflow:auto;border-radius:8px;box-shadow:0 4px 12px var(--shadow);background:var(--panel);}
-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;}
-thead th,tbody td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--table-border);white-space:nowrap;}
-thead th{
-  position:sticky;top:0;z-index:2;background:var(--accent);
-  color:var(--accent-contrast);font-weight:bold;text-transform:uppercase;cursor:pointer;
-}
-tbody tr:nth-child(even){background:var(--row-even);}
-tbody tr:nth-child(odd){background:var(--row-odd);}
-tbody tr:hover{background:var(--accent-muted);}
-.sort-arrow{margin-left:5px;font-size:11px;color:var(--accent-contrast);}
-
-/* Cellule actions + boutons survol */
-td.action-cell{display:flex;align-items:center;gap:8px;}
-.action-btn{
-  background:var(--accent);color:var(--accent-contrast);border:none;cursor:pointer;
-  font-weight:bold;padding:6px 12px;border-radius:6px;font-size:12px;transition:0.2s;
-  margin-right:6px;opacity:0;visibility:hidden;
-}
-tbody tr:hover .action-btn{opacity:1;visibility:visible;}
-.action-btn:hover{background:var(--accent-darker);transform:scale(1.05);}
-
-/* Miniatures JPG */
-#csvTable td img{
-  max-width:120px;
-  cursor:pointer;border-radius:6px;border:1px solid var(--thumb-border);
-  transition:transform 0.2s,box-shadow 0.2s;margin-right:6px;
-}
-#csvTable td img:hover{transform:scale(1.08);box-shadow:0 0 8px var(--shadow);}
-
-/* Flèche animée */
-@keyframes bounceLeft {0%,100% { transform: translateX(0);}50% { transform: translateX(-8px);} }
-.arrow-hint {display:inline-block;margin-right:8px;color:var(--accent-darker);
-  font-size:22px;animation:bounceLeft 1s infinite;}
-
-/* Spinner */
-#spinner{
-  display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:40px;height:40px;border:6px solid #f3f3f3;border-top:6px solid var(--accent);border-radius:50%;
-}
-
-/* Modale images */
-.modal{display:none;position:fixed;z-index:1300;padding-top:50px;left:0;top:0;width:100%;height:100%;background-color:var(--overlay);text-align:center;}
-.modal .close{position:absolute;top:15px;right:25px;color:#fff;font-size:30px;cursor:pointer;}
-.modal iframe{width:90%;height:80vh;border:none;border-radius:10px;background:#000;}
-.modal-actions{margin-top:15px;display:flex;justify-content:center;gap:10px;}
-.modal-actions button{background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;font-weight:bold;}
-.modal-actions button:hover{background:var(--accent-darker);}
-
-/* Overlay ZIP */
-#zipOverlay{
-  display:none;position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,0.4);z-index:1400;justify-content:center;align-items:center;
-}
-#zipBox{
-  background:var(--accent-muted);color:var(--text);padding:20px 25px;border-radius:12px;
-  text-align:center;width:300px;box-shadow:0 4px 12px rgba(0,0,0,0.3);position:relative;
-}
-#zipBox h2{margin:0 0 10px 0;color:var(--accent);font-size:18px;}
-#zipFileName{font-size:13px;margin-bottom:15px;color:var(--muted-text);word-break:break-word;}
-#zipProgressBar{width:100%;height:22px;background:#eee;border-radius:11px;overflow:hidden;}
-#zipProgress{
-  height:100%;width:0;background:var(--accent);transition:width 0.3s;
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:13px;
-}
-#zipCounter{margin-top:10px;font-size:12px;color:var(--text);}
-#zipTime{margin-top:5px;font-size:12px;color:var(--muted-text);}
-#zipClose{
-  position:absolute;top:8px;right:12px;font-size:18px;font-weight:bold;color:var(--accent);cursor:pointer;
-}
-#zipClose:hover{color:var(--accent-darker);}
-
-/* Menu secret (thèmes) */
-#secretBtn {
-  position: fixed;bottom: 10px;right: 10px;width: 25px;height: 25px;
-  opacity: 0;cursor: pointer;z-index: 2000;
-}
-#themeMenu {
-  display:none;position:fixed;bottom:50px;right:10px;background: var(--panel);
-  border:2px solid var(--accent);border-radius:8px;box-shadow:0 4px 12px var(--shadow);
-  padding:10px;z-index:2001;min-width:150px;
-}
-#themeMenu h3 {margin:0 0 8px 0;font-size:14px;color: var(--accent);}
-#themeMenu .closeMenu {position:absolute;top:5px;right:8px;font-size:14px;cursor:pointer;color:var(--accent);}
-#themeMenu .closeMenu:hover {color:var(--accent-darker);}
-#themeMenu button {
-  display:block;width:100%;margin:4px 0;padding:6px;border:none;border-radius:6px;
-  background: var(--accent);color: var(--accent-contrast);cursor:pointer;font-size:13px;
-}
-#themeMenu button:hover {background: var(--accent-darker);}
-.flame {
+#tableContainer{
   display:inline-block;
-  animation:flicker 0.6s infinite alternate;
+  overflow:auto;
+  max-width:100%;
+  max-height:100%;
+  border-radius:8px;
+  box-shadow:0 4px 12px var(--shadow);
+  background:var(--panel);
+  text-align:center;
 }
 
-@keyframes flicker {
-  0%   { transform: translateY(0) scale(1); color: #ff7043; }
-  30%  { transform: translateY(-1px) scale(1.05); color: #ff5722; }
-  60%  { transform: translateY(-2px) scale(1.1); color: #ff9800; }
-  100% { transform: translateY(0) scale(1); color: #ff7043; }
+/* Table */
+table{width:auto; border-collapse:separate; border-spacing:0; table-layout:auto; font-size:13px;}
+thead th, tbody td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--sidebar-bg); white-space:nowrap; transition:background-color .6s ease, color .6s ease;}
+thead th{position:sticky; top:0; z-index:2; background-color:var(--accent); color:#fff; font-weight:bold; text-transform:uppercase; letter-spacing:.05em; cursor:pointer; user-select:none; font-size:12px;}
+thead th:hover{background-color:var(--accent-darker);}
+tbody tr:nth-child(even){background-color:var(--sidebar-bg);}
+tbody tr:nth-child(odd){background-color:var(--panel);}
+tbody tr:hover{background-color:var(--accent-muted); transition:background-color .3s ease;}
+thead th.sorted-asc::after{content:" ▲"; font-size:10px;}
+thead th.sorted-desc::after{content:" ▼"; font-size:10px;}
+
+/* Column toggles panel */
+#columnToggles{
+  display:none;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:10px;
+  margin:5px 0;
 }
+#columnToggles.open{ display:flex; }
+#columnToggles label{font-size:12px; cursor:pointer; margin-right:5px;}
+#columnToggles input[type="checkbox"]{width:14px; height:14px; vertical-align:middle; margin-right:3px;}
 
+/* Reset flash */
+.flash-red{animation:flashRed .6s ease;}
+@keyframes flashRed{0%{background-color:var(--accent-muted);}100%{background-color:var(--panel);}}
 
+/* Secret theme menu */
+#secretBtn{position:fixed; bottom:10px; right:10px; width:25px; height:25px; opacity:0; cursor:pointer; z-index:2000;}
+#themeMenu{display:none; position:fixed; bottom:50px; right:10px; background:var(--panel);
+  border:2px solid var(--accent); border-radius:8px; box-shadow:0 4px 12px var(--shadow);
+  padding:10px; z-index:2001; min-width:150px;}
+#themeMenu h3{margin:0 0 8px 0; font-size:14px; color:var(--accent);}
+#themeMenu .closeMenu{position:absolute; top:5px; right:8px; font-size:14px; cursor:pointer; color:var(--accent);}
+#themeMenu .closeMenu:hover{color:var(--accent-darker);}
+#themeMenu button{display:block; width:100%; margin:4px 0; padding:6px; border:none; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; font-size:13px;}
+#themeMenu button:hover{background:var(--accent-darker);}
+
+/* Overlay + Spinner */
+#loadingOverlay{position:fixed; inset:0; background:rgba(0,0,0,0.05); display:none; z-index:2500;}
+#spinner{position:absolute; top:50%; left:50%; width:40px; height:40px; margin:-20px 0 0 -20px; border:6px solid #f3f3f3; border-top:6px solid var(--accent); border-radius:50%; animation:spin .8s linear infinite;}
+@keyframes spin{from{transform:rotate(0deg);} to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
 
-<div id="netAlert">⚠️ Pas de connexion internet détectée. Vérifiez votre réseau.</div>
-<div id="spinner"></div>
-
-<!-- Sidebar dossiers -->
-<div id="sidebar">
-  <h2><span>📁</span>Dossiers</h2>
-  <ul id="folderTree"></ul>
-</div>
-
-<!-- Main -->
-<div id="main">
-  <div class="header">
-    <img src="img/logo.png" class="logo" id="mainLogo" alt="Logo"/>
-    <div id="fileNameContainer">
-      <div id="fileName"></div>
-      <div id="lineCount"></div>
-    </div>
-  </div>
-
-  <div class="controls">
-    Filtrer par date : 
-    <div class="date-field"><span id="iconStart">📅</span><input type="date" id="startDate"></div>
-    à
-    <div class="date-field"><span id="iconEnd">📅</span><input type="date" id="endDate"></div>
-    <button onclick="applyFilter()">Filtrer</button>
-    <button onclick="clearFilter()">Tout afficher</button>
-    <button id="downloadFolderBtn">Télécharger le dossier</button>
-  </div>
-
-  <div id="tableWrapper">
-    <div id="tableContainer">
-      <table id="csvTable">
-        <thead>
-          <tr>
-            <th onclick="sortTable(0,'date')">Date <span class="sort-arrow"></span></th>
-            <th>Nom du fichier</th>
-            <th>Dossier</th>
-            <th onclick="sortTable(3,'number')">Taille <span class="sort-arrow"></span></th>
-            <th>Télécharger / Ouvrir</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td colspan="5" style="text-align:left;">
-              <span class="arrow-hint">⬅</span> Sélectionner un dossier...
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+<div class="header">
+  <img src="img/logo.png" alt="Logo SMES France" class="logo" id="mainLogo"/>
+  <div id="fileNameContainer">
+    <div id="fileName"></div>
+    <div id="lineCount"></div>
   </div>
 </div>
 
-<!-- Modale image -->
-<div id="imageModal" class="modal" role="dialog" aria-modal="true">
-  <span class="close" onclick="closeModal()" aria-label="Fermer">&times;</span>
-  <!-- tabindex=-1 pour éviter que l'iframe vole le focus / bloque les flèches -->
-  <iframe id="modalFrame" tabindex="-1"></iframe>
-  <div class="modal-actions">
-    <button id="prevBtn">&larr; Précédent</button>
-    <button id="nextBtn">Suivant &rarr;</button>
-    <button id="downloadBtn">Télécharger</button>
-  </div>
+<div class="controls">
+  <button id="backBtn">⬅️ Retour</button>
+  <button id="prevFile">⬅️ Fichier précédent</button>
+  <button id="nextFile">Fichier suivant ➡️</button>
+  <input type="text" id="searchInput" placeholder="🔎 Rechercher..." />
+  <button id="exportExcel">📊 Export Excel</button>
+  <button id="exportPDF">📄 Export PDF</button>
+  <button id="toggleColumnsBtn">Afficher/Masquer colonnes</button>
+  <button id="resetBtn">♻️ Réinitialiser affichage</button>
 </div>
 
-<!-- Overlay ZIP -->
-<div id="zipOverlay">
-  <div id="zipBox">
-    <span id="zipClose">&times;</span>
-    <h2>Préparation du ZIP...</h2>
-    <div id="zipFileName"></div>
-    <div id="zipProgressBar"><div id="zipProgress">0%</div></div>
-    <div id="zipCounter">0 / 0 fichiers</div>
-    <div id="zipTime">Temps restant : --</div>
-  </div>
+<div id="columnToggles"></div>
+<div id="tableWrapper"><div id="tableContainer"></div></div>
+
+<!-- Overlay + spinner -->
+<div id="loadingOverlay" aria-hidden="true">
+  <div id="spinner" role="status" aria-label="Chargement"></div>
 </div>
 
-<!-- Bouton secret + menu thèmes -->
-<div id="secretBtn" title=" "></div>
+<!-- Menu secret -->
+<div id="secretBtn"></div>
 <div id="themeMenu">
   <span class="closeMenu" onclick="closeThemeMenu()">❌</span>
   <h3>Choisir un thème</h3>
@@ -299,613 +149,514 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
   <button onclick="setTheme('bordeaux')">Bordeaux</button>
 </div>
 
+<script src="libs/papaparse.min.js"></script>
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/jspdf.umd.min.js"></script>
+<script src="libs/jspdf.plugin.autotable.min.js"></script>
 <script>
-/* ----------- Config Drive ----------- */
-const API_KEY="AIzaSyCbEV3CS9bOcxq5eK-QXbjczGHjvzyXS6M";
-const ROOT_FOLDER_ID="18QkQPyCZxTCAaoz_qd1wAelmQbSE4ex8";
+// === Variables globales ===
+const API_KEY='AIzaSyCbEV3CS9bOcxq5eK-QXbjczGHjvzyXS6M';
+const VIS_MEM_KEY = 'columnVisibilityMemory';
+let currentData=[], sortAsc=true, sortColIndex=null, visibleColumns={},
+    columnVisibilityMemory = JSON.parse(localStorage.getItem(VIS_MEM_KEY) || '{}'),
+    columnSortMemory={colName:null,asc:true}, lastSearchQuery="", lastColorizedColIndex=null;
 
-/* ----------- Config personnalisée ----------- */
-const FLAME_THRESHOLD = 40.0;   // seuil déclencheur de la flamme 🔥
-
-/* ----------- État ----------- */
-let imageFiles=[], currentImageIndex=0;
-let filterStartDate="", filterEndDate="";
 let themeMenuTimer;
+let csvFilesList = JSON.parse(localStorage.getItem("csvFilesList")||"[]");
+let currentIndex = parseInt(localStorage.getItem("csvFileIndex")||"0",10);
 
-/* ----------- Utilitaires UI ----------- */
-const spinner=document.getElementById('spinner');
-function showSpinner(){spinner.style.display='block';}
-function hideSpinner(){spinner.style.display='none';}
-
-function updateNetworkStatus(){
-  document.getElementById("netAlert").style.display = navigator.onLine ? "none" : "block";
-}
-window.addEventListener("online",updateNetworkStatus);
-window.addEventListener("offline",updateNetworkStatus);
-
-function formatSize(bytes){
-  if(!bytes) return "?";
-  const units=["o","Ko","Mo","Go"]; let i=0; let v=Number(bytes);
-  while(v>=1024 && i<units.length-1){ v/=1024; i++; }
-  return (i===0?Math.round(v):v.toFixed(1))+" "+units[i];
-}
-
-/* ----------- Drive API ----------- */
-async function fetchFolderContents(folderId){
-  if(!navigator.onLine){updateNetworkStatus();return [];}
-  showSpinner();
-  try{
-    const res=await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&key=${API_KEY}&fields=files(id,name,mimeType,size,createdTime,modifiedTime)`);
-    const data=await res.json();
-    if(data.error){
-      alert("Erreur Drive: "+data.error.message);
-      console.error("Drive error:", data.error);
-      return [];
-    }
-    return data.files||[];
-  }catch(e){
-    console.error("Erreur Drive:",e);
-    alert("Impossible de charger le dossier (réseau/API). Ouvre la console pour le détail.");
-    return [];
-  }finally{hideSpinner();}
-}
-
-async function loadRootFolders(){
-  const files = await fetchFolderContents(ROOT_FOLDER_ID);
-  const rootUL = document.getElementById('folderTree');
-  rootUL.innerHTML = '';
-
-  files.filter(f => f.mimeType === 'application/vnd.google-apps.folder').forEach(f => {
-    const li = document.createElement('li'); 
-    li.dataset.id = f.id;
-
-    const toggle = document.createElement('span'); 
-    toggle.className = 'folder-toggle'; 
-    toggle.textContent = '+';
-    toggle.onclick = () => toggleFolder(li);
-
-    const span = document.createElement('span'); 
-    span.className = 'folder-name'; 
-    span.textContent = f.name;
-    span.onclick = () => loadFolderFilesOnClick(li);
-
-    li.appendChild(toggle); 
-    li.appendChild(span); 
-    rootUL.appendChild(li);
-  });
-
-  // 🔥 Vérifier automatiquement deux crans plus bas sans ouvrir visuellement
-  setTimeout(async () => {
-    const siteFolders = document.querySelectorAll("#folderTree > li");
-
-    for (const siteLi of siteFolders) {
-      const subFolders = await fetchChildren(siteLi.dataset.id);
-      for (const sub of subFolders) {
-        if (sub.name.includes("Temp")) {
-          await checkTraçaTempToday(siteLi, sub.id); 
-        }
-      }
-    }
-  }, 1000);
-}
-
-async function toggleFolder(li){
-  const toggle=li.querySelector('.folder-toggle');
-  if(li.dataset.loaded==='true'){
-    const ul=li.querySelector('ul');
-    if(ul){ul.style.display=ul.style.display==='none'?'block':'none'; toggle.textContent=ul.style.display==='block'?'–':'+';}
-    return;
-  }
-  toggle.textContent='…';
-  const files=await fetchFolderContents(li.dataset.id);
-  const ul=document.createElement('ul');
-  for (const f of files.filter(f => f.mimeType === 'application/vnd.google-apps.folder')) {
-    const childLi=document.createElement('li'); 
-    childLi.dataset.id=f.id;
-
-    const childToggle=document.createElement('span'); 
-    childToggle.className='folder-toggle'; 
-    childToggle.textContent='+';
-    childToggle.onclick=()=>toggleFolder(childLi);
-
-    const span=document.createElement('span'); 
-    span.className='folder-name'; 
-    span.textContent=f.name;
-    span.onclick=()=>loadFolderFilesOnClick(childLi);
-
-    childLi.appendChild(childToggle); 
-    childLi.appendChild(span); 
-    ul.appendChild(childLi);
-
-    // ✅ Cas spécial : si le dossier est Traça_Temp → précharger Historique
-    if (f.name.toLowerCase().includes("traça_temp") || f.name.toLowerCase().includes("traca_temp")) {
-      const siblings = await fetchFolderContents(li.dataset.id);
-      const hist = siblings.find(s => s.mimeType === 'application/vnd.google-apps.folder' && s.name.toLowerCase().includes("historique"));
-      if (hist) {
-        const histFiles = await fetchFolderContents(hist.id);
-        const z3Files = histFiles.filter(ff => ff.name.toUpperCase().startsWith("Z3") && ff.name.toLowerCase().endsWith(".csv"));
-        localStorage.setItem("csvZ3Files", JSON.stringify(z3Files));
-        console.log("[INDEX] Z3 préchargés:", z3Files.length);
-      }
-    }
-
-    // ✅ Vérif Temp (flamme 🔥)
-    if(f.name.includes("Temp")){ checkTraçaTempToday(li, f.id); }
-  }
-  li.appendChild(ul); 
-  li.dataset.loaded='true'; 
-  toggle.textContent='+';
-}
-
-
-// Fonction utilitaire pour récupérer les sous-dossiers sans modifier l'affichage
-async function fetchChildren(folderId){
-  const files = await fetchFolderContents(folderId);
-  return files.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
-}
-
-async function loadFolderFilesOnClick(li){
-  await toggleFolder(li);
-
-  // Réinitialiser la sélection visuelle
-  document.querySelectorAll('#folderTree li span.folder-name').forEach(s=>s.classList.remove('active-folder'));
-  const nameSpan = li.querySelector('span.folder-name');
-  if(nameSpan){ 
-    nameSpan.classList.add('active-folder'); 
-  }
-  localStorage.setItem('lastFolderId', li.dataset.id);
-
-  const folderName = nameSpan ? nameSpan.textContent.toLowerCase() : "";
-
-  // ⚡ Gestion spéciale Z3
-  if (folderName.includes("traça_temp") || folderName.includes("traca_temp")) {
-    // récupérer le dossier parent (= site)
-    const siteLi = li.parentElement.closest("li");
-    if (siteLi && siteLi.dataset.id) {
-      const siblings = await fetchFolderContents(siteLi.dataset.id);
-      const hist = siblings.find(s => 
-        s.mimeType === 'application/vnd.google-apps.folder' && 
-        s.name.toLowerCase().includes("historique")
-      );
-
-      if (hist) {
-        const histFiles = await fetchFolderContents(hist.id);
-        const z3Files = histFiles.filter(ff => 
-          ff.name.toUpperCase().startsWith("Z3") && 
-          ff.name.toLowerCase().endsWith(".csv")
-        );
-        localStorage.setItem("csvZ3Files", JSON.stringify(z3Files));
-        console.log("[Z3] Préchargés depuis Historique voisin:", z3Files.length);
-      } else {
-        localStorage.removeItem("csvZ3Files");
-        console.warn("[Z3] Aucun dossier Historique trouvé pour", nameSpan.textContent);
-      }
-    }
-  } 
-  else if (folderName.includes("historique")) {
-    // directement charger les Z3 de ce dossier
-    const histFiles = await fetchFolderContents(li.dataset.id);
-    const z3Files = histFiles.filter(ff => 
-      ff.name.toUpperCase().startsWith("Z3") && 
-      ff.name.toLowerCase().endsWith(".csv")
-    );
-    localStorage.setItem("csvZ3Files", JSON.stringify(z3Files));
-    console.log("[Z3] Préchargés directement (Historique):", z3Files.length);
-  } 
-  else {
-    // Sinon → effacer le cache Z3
-    localStorage.removeItem("csvZ3Files");
-    console.log("[Z3] Cache vidé (hors Traça_Temp / Historique)");
-  }
-
-  // Charger fichiers CSV/JPG classiques du dossier
-  const files = await fetchFolderContents(li.dataset.id);
-  const filtered = files.filter(f => 
-    f.name.toLowerCase().endsWith('.csv') || 
-    f.name.toLowerCase().endsWith('.jpg') || 
-    f.name.toLowerCase().endsWith('.jpeg')
-  );
-  imageFiles = filtered.filter(f => /\.(jpg|jpeg)$/i.test(f.name)); // pour la modale
-  displayFiles(filtered, nameSpan ? nameSpan.textContent : '');
-}
-
-
-
-function displayFiles(files, folderName){
-  const tbody=document.querySelector('#csvTable tbody');
-  const downloadBtn=document.getElementById('downloadFolderBtn');
-  tbody.innerHTML='';
-
-  if(files.length===0){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;">Aucun fichier</td></tr>';
-    downloadBtn.style.display="none";
-    return;
-  }
-
-  downloadBtn.style.display="inline-block";
-
-  for(const f of files){
-    // Date
-    let date='';
-    const m=f.name.match(/(\d{8})\.csv$/i);
-    if(m){ date=`${m[1].slice(0,4)}-${m[1].slice(4,6)}-${m[1].slice(6,8)}`; }
-    else if(/\.(jpg|jpeg)$/i.test(f.name)){
-      if(f.modifiedTime) date=f.modifiedTime.slice(0,10);
-      else if(f.createdTime) date=f.createdTime.slice(0,10);
-    }
-
-    if((filterStartDate && date<filterStartDate) || (filterEndDate && date>filterEndDate)) continue;
-
-const tr=document.createElement('tr');
-
-// Bloc DATE avec affichage du jour
-const tdDate=document.createElement('td');
-if (date) {
-  const d = new Date(date);
-  const jours = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
-  const jourNom = jours[d.getDay()];
-  tdDate.textContent = `${date} (${jourNom})`;
-
-  // Week-end → rouge + gras
-  if (d.getDay() === 0 || d.getDay() === 6) {
-    tdDate.style.color = "var(--danger)";
-    tdDate.style.fontWeight = "bold";
-  }
-} else {
-  tdDate.textContent = '';
-}
-
-const tdName=document.createElement('td'); tdName.textContent=f.name;
-const tdFolder=document.createElement('td'); tdFolder.textContent=folderName;
-
-    const tdSize = document.createElement('td');
-    if (f.size) {
-      tdSize.textContent = formatSize(f.size);
-      if (parseInt(f.size) < 200) {
-        tdSize.style.color = "#999";
-        tdSize.textContent += " (vide)";
-      } else {
-        tdSize.style.color = "inherit";
-      }
-    } else {
-      tdSize.textContent = '?';
-    }
-
-    const tdAction=document.createElement('td'); tdAction.className='action-cell';
-    let html='';
-    if(f.name.toLowerCase().endsWith('.csv')){
-      html+=`<a href="https://drive.google.com/uc?export=download&id=${f.id}" target="_blank"><button class="action-btn">Télécharger</button></a>`;
-      html+=`<button class="action-btn" onclick="openViewer('viewer.html','${f.id}','${f.name}')">Tableau</button>`;
-      html+=`<button class="action-btn" onclick="openViewer('viewer02.html','${f.id}','${f.name}')">Courbes</button>`;
-    }
-    if(/\.(jpg|jpeg)$/i.test(f.name)){
-      html+=`<img src="https://drive.google.com/thumbnail?id=${f.id}" onclick="openModal('${f.id}')" alt="aperçu">`;
-      html+=`<a href="https://drive.google.com/uc?export=download&id=${f.id}" target="_blank"><button class="action-btn">Télécharger</button></a>`;
-    }
-    tdAction.innerHTML=html;
-
-    tr.appendChild(tdDate); tr.appendChild(tdName); tr.appendChild(tdFolder); tr.appendChild(tdSize); tr.appendChild(tdAction);
-    tbody.appendChild(tr);
-  }
-}
-
-/* ----------- Open viewer (CSV list + index) ----------- */
-async function openViewer(viewer, id, name){
-  const active = document.querySelector('#folderTree .active-folder');
-  if (!active) { alert("Sélectionnez un dossier !"); return; }
-
-  const folderId = localStorage.getItem('lastFolderId');
-
-  // SA du dossier courant
-  const files = await fetchFolderContents(folderId);
-  const saFiles = files.filter(f => f.name.toUpperCase().startsWith("SA") && f.name.toLowerCase().endsWith('.csv'));
-
-  // 🔗 Récupérer les Z3 préchargés
-  const z3Files = JSON.parse(localStorage.getItem("csvZ3Files") || "[]");
-
-  // SA + Z3 → Viewer
-  const allCsv = [...saFiles, ...z3Files];
-  localStorage.setItem("csvFilesList", JSON.stringify(allCsv));
-
-  const index = allCsv.findIndex(f => f.id === id);
-  localStorage.setItem("csvFileIndex", index);
-
-  window.open(`${viewer}?fileId=${id}&fileName=${encodeURIComponent(name)}`,'_blank');
-}
-
-
-/* ----------- Filtres ----------- */
-function applyFilter(){
-  filterStartDate=document.getElementById('startDate').value;
-  filterEndDate=document.getElementById('endDate').value;
-  const active=document.querySelector('#folderTree .active-folder');
-  if(active) active.click();
-}
-function clearFilter(){
-  filterStartDate=''; filterEndDate='';
-  document.getElementById('startDate').value=''; document.getElementById('endDate').value='';
-  const active=document.querySelector('#folderTree .active-folder');
-  if(active) active.click();
-}
-
-/* ----------- Modale images + navigation clavier ----------- */
-function openModal(id){
-  const modal=document.getElementById('imageModal');
-  modal.style.display='block';
-  document.getElementById('modalFrame').src=`https://drive.google.com/file/d/${id}/preview`;
-  currentImageIndex=imageFiles.findIndex(f=>f.id===id);
-  document.getElementById('downloadBtn').onclick=()=>window.open(`https://drive.google.com/uc?export=download&id=${id}`,'_blank');
-}
-function closeModal(){document.getElementById('imageModal').style.display='none';}
-
-document.getElementById('prevBtn').onclick=()=>{if(currentImageIndex>0) openModal(imageFiles[--currentImageIndex].id);};
-document.getElementById('nextBtn').onclick=()=>{if(currentImageIndex<imageFiles.length-1) openModal(imageFiles[++currentImageIndex].id);};
-window.addEventListener('click',e=>{if(e.target===document.getElementById('imageModal')) closeModal();});
-
-// Navigation clavier quand la modale est ouverte
-window.addEventListener('keydown', e=>{
-  const modal=document.getElementById('imageModal');
-  if(modal.style.display==='block'){
-    if(e.key==='ArrowLeft' && currentImageIndex>0){ openModal(imageFiles[--currentImageIndex].id); }
-    if(e.key==='ArrowRight' && currentImageIndex<imageFiles.length-1){ openModal(imageFiles[++currentImageIndex].id); }
-    if(e.key==='Escape'){ closeModal(); }
-  }
-});
-
-/* ----------- ZIP overlay + progression + annulation ----------- */
-const zipOverlay=document.getElementById('zipOverlay');
-const zipProgress=document.getElementById('zipProgress');
-const zipCounter=document.getElementById('zipCounter');
-const zipFileName=document.getElementById('zipFileName');
-const zipTime=document.getElementById('zipTime');
-const zipClose=document.getElementById('zipClose');
-let zipCancelled=false, zipStartTime=0;
-
-function sanitizeFileName(name){ return name.replace(/[\/\:*?"<>|]/g,"_"); }
-
-function showZipOverlay(name){
-  zipCancelled=false;
-  zipOverlay.style.display='flex';
-  zipFileName.textContent=name;
-  zipProgress.style.width='0%';
-  zipProgress.textContent='0%';
-  zipCounter.textContent='0 / 0 fichiers';
-  zipTime.textContent='Temps restant : --';
-  zipStartTime=Date.now();
-}
-function hideZipOverlay(){zipOverlay.style.display='none';}
-function updateZipProgress(pct,current,total,sizeAccum){
-  zipProgress.style.width=pct+'%';
-  zipProgress.textContent=pct+'%';
-  zipCounter.textContent=`${current} / ${total} fichiers`;
-  if(current>0){
-    const elapsed=(Date.now()-zipStartTime)/1000;
-    const speedFiles=current/elapsed;
-    const speedKB=(sizeAccum/1024)/elapsed;
-    const remainingFiles=total-current;
-    const remainingTime=remainingFiles/Math.max(speedFiles,0.0001);
-    const mins=Math.floor(remainingTime/60);
-    const secs=Math.round(remainingTime%60);
-    zipTime.textContent=`Temps restant : ${mins>0?mins+'m ':''}${secs}s (${speedFiles.toFixed(1)} fichiers/s, ${Math.max(0,speedKB).toFixed(0)} Ko/s)`;
-  }
-}
-zipClose.onclick=()=>{zipCancelled=true;hideZipOverlay();alert("Préparation ZIP annulée.");};
-
-document.getElementById('downloadFolderBtn').onclick=async()=>{
-  const active=document.querySelector('#folderTree .active-folder');
-  if(!active){alert("Sélectionnez un dossier !"); return;}
-  const folderId=localStorage.getItem('lastFolderId');
-  const folderName=active.textContent.trim();
-  showZipOverlay(folderName+".zip");
-  const files=await fetchFolderContents(folderId);
-  if(!files||files.length===0){hideZipOverlay();alert("Aucun fichier dans ce dossier."); return;}
-  const zip=new JSZip(); let count=0; let doneSize=0;
-  for(const f of files){
-    if(zipCancelled) return;
-    try{
-      const url=`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&key=${API_KEY}`;
-      const res=await fetch(url);
-      if(!res.ok) throw new Error('Fetch media failed: '+res.status);
-      const blob=await res.blob();
-      zip.file(sanitizeFileName(f.name), blob);
-      count++; doneSize += f.size ? parseInt(f.size) : 0;
-      updateZipProgress(Math.round((count/files.length)*100), count, files.length, doneSize);
-    }catch(e){console.error("Erreur sur",f.name,e);}
-  }
-  if(zipCancelled) return;
-  const content=await zip.generateAsync({type:"blob"});
-  saveAs(content, folderName+".zip");
-  hideZipOverlay();
-};
-
-/* ----------- Tri tableau + recolorisation ----------- */
-let currentSort = { col: null, asc: true };
-
-function sortTable(colIndex, type) {
-  const table = document.getElementById("csvTable");
-  const tbody = table.tBodies[0];
-  const rows = Array.from(tbody.querySelectorAll("tr"));
-
-  if (currentSort.col === colIndex) {
-    currentSort.asc = !currentSort.asc;
-  } else {
-    currentSort.col = colIndex;
-    currentSort.asc = true;
-  }
-
-  rows.sort((a, b) => {
-    let aText = a.cells[colIndex]?.textContent.trim() || "";
-    let bText = b.cells[colIndex]?.textContent.trim() || "";
-    if (type === "number") {
-      aText = parseFloat(aText) || 0;
-      bText = parseFloat(bText) || 0;
-    } else if (type === "date") {
-      aText = new Date(aText).getTime() || 0;
-      bText = new Date(bText).getTime() || 0;
-    }
-    if (aText < bText) return currentSort.asc ? -1 : 1;
-    if (aText > bText) return currentSort.asc ? 1 : -1;
-    return 0;
-  });
-
-  tbody.innerHTML = "";
-  rows.forEach(r => tbody.appendChild(r));
-
-  // mise à jour des flèches
-  document.querySelectorAll("thead th .sort-arrow").forEach(span => span.textContent = "");
-  const arrow = table.tHead.rows[0].cells[colIndex].querySelector(".sort-arrow");
-  if (arrow) arrow.textContent = currentSort.asc ? "▲" : "▼";
-}
-
-/* ----------- Icônes calendrier cliquables ----------- */
-document.getElementById("iconStart").onclick=()=>document.getElementById("startDate").showPicker?.()||document.getElementById("startDate").focus();
-document.getElementById("iconEnd").onclick=()=>document.getElementById("endDate").showPicker?.()||document.getElementById("endDate").focus();
-
-/* ----------- Menu secret (thèmes) ----------- */
-document.getElementById("secretBtn").onclick=()=>{
-  const menu=document.getElementById("themeMenu");
-  if(menu.style.display==="block"){ closeThemeMenu(); }
-  else { menu.style.display="block"; resetThemeMenuTimer(); }
-};
-function resetThemeMenuTimer(){ clearTimeout(themeMenuTimer); themeMenuTimer=setTimeout(closeThemeMenu,10000); }
-function closeThemeMenu(){ document.getElementById("themeMenu").style.display="none"; clearTimeout(themeMenuTimer); }
-
-/* ----------- Thèmes + persistance (+ lignes du tableau) ----------- */
+// === Thèmes ===
 function setTheme(theme){
   const r=document.documentElement;
   const logo=document.getElementById("mainLogo");
   logo.style.display=(theme==="orange")?"block":"none";
   localStorage.setItem("selectedTheme",theme);
 
-  if(theme==="orange"){
-    r.style.setProperty("--accent","#ff7043");
-    r.style.setProperty("--accent-darker","#e64a19");
-    r.style.setProperty("--accent-muted","#ffccbc");
-    r.style.setProperty("--bg","#fff5f5");
-    r.style.setProperty("--panel","#ffffff");
-    r.style.setProperty("--sidebar-bg","#ffe5d9");
-    r.style.setProperty("--danger","#d84315");
-    r.style.setProperty("--text","#333");
-    r.style.setProperty("--row-even","#ffe5d9");
-    r.style.setProperty("--row-odd","#fff5f5");
-  }
-  if(theme==="blue"){
-    r.style.setProperty("--accent","#2196f3");
-    r.style.setProperty("--accent-darker","#1976d2");
-    r.style.setProperty("--accent-muted","#bbdefb");
-    r.style.setProperty("--bg","#e3f2fd");
-    r.style.setProperty("--panel","#ffffff");
-    r.style.setProperty("--sidebar-bg","#bbdefb");
-    r.style.setProperty("--danger","#0d47a1");
-    r.style.setProperty("--text","#0d47a1");
-    r.style.setProperty("--row-even","#bbdefb");
-    r.style.setProperty("--row-odd","#e3f2fd");
-  }
-  if(theme==="green"){
-    r.style.setProperty("--accent","#4caf50");
-    r.style.setProperty("--accent-darker","#2e7d32");
-    r.style.setProperty("--accent-muted","#c8e6c9");
-    r.style.setProperty("--bg","#f1f8e9");
-    r.style.setProperty("--panel","#ffffff");
-    r.style.setProperty("--sidebar-bg","#c8e6c9");
-    r.style.setProperty("--danger","#1b5e20");
-    r.style.setProperty("--text","#1b5e20");
-    r.style.setProperty("--row-even","#c8e6c9");
-    r.style.setProperty("--row-odd","#f1f8e9");
-  }
-  if(theme==="purple"){
-    r.style.setProperty("--accent","#9c27b0");
-    r.style.setProperty("--accent-darker","#6a1b9a");
-    r.style.setProperty("--accent-muted","#e1bee7");
-    r.style.setProperty("--bg","#f3e5f5");
-    r.style.setProperty("--panel","#ffffff");
-    r.style.setProperty("--sidebar-bg","#e1bee7");
-    r.style.setProperty("--danger","#4a148c");
-    r.style.setProperty("--text","#4a148c");
-    r.style.setProperty("--row-even","#e1bee7");
-    r.style.setProperty("--row-odd","#f3e5f5");
-  }
-  if(theme==="bordeaux"){
-    r.style.setProperty("--accent","#800020");
-    r.style.setProperty("--accent-darker","#4b0014");
-    r.style.setProperty("--accent-muted","#d7a1a9");
-    r.style.setProperty("--bg","#fff0f2");
-    r.style.setProperty("--panel","#ffffff");
-    r.style.setProperty("--sidebar-bg","#f3cdd3");
-    r.style.setProperty("--danger","#600018");
-    r.style.setProperty("--text","#4b0014");
-    r.style.setProperty("--row-even","#f3cdd3");
-    r.style.setProperty("--row-odd","#fff0f2");
-  }
+  if(theme==="orange"){r.style.setProperty("--accent","#ff7043");r.style.setProperty("--accent-darker","#e64a19");r.style.setProperty("--accent-muted","#ffccbc");r.style.setProperty("--bg","#fff5f5");r.style.setProperty("--panel","#ffffff");r.style.setProperty("--sidebar-bg","#ffe5d9");r.style.setProperty("--danger","#d84315");r.style.setProperty("--text","#333");}
+  if(theme==="blue"){r.style.setProperty("--accent","#2196f3");r.style.setProperty("--accent-darker","#1976d2");r.style.setProperty("--accent-muted","#bbdefb");r.style.setProperty("--bg","#e3f2fd");r.style.setProperty("--panel","#ffffff");r.style.setProperty("--sidebar-bg","#bbdefb");r.style.setProperty("--danger","#0d47a1");r.style.setProperty("--text","#0d47a1");}
+  if(theme==="green"){r.style.setProperty("--accent","#4caf50");r.style.setProperty("--accent-darker","#2e7d32");r.style.setProperty("--accent-muted","#c8e6c9");r.style.setProperty("--bg","#f1f8e9");r.style.setProperty("--panel","#ffffff");r.style.setProperty("--sidebar-bg","#c8e6c9");r.style.setProperty("--danger","#1b5e20");r.style.setProperty("--text","#1b5e20");}
+  if(theme==="purple"){r.style.setProperty("--accent","#9c27b0");r.style.setProperty("--accent-darker","#6a1b9a");r.style.setProperty("--accent-muted","#e1bee7");r.style.setProperty("--bg","#f3e5f5");r.style.setProperty("--panel","#ffffff");r.style.setProperty("--sidebar-bg","#e1bee7");r.style.setProperty("--danger","#4a148c");r.style.setProperty("--text","#4a148c");}
+  if(theme==="bordeaux"){r.style.setProperty("--accent","#800020");r.style.setProperty("--accent-darker","#4b0014");r.style.setProperty("--accent-muted","#d7a1a9");r.style.setProperty("--bg","#fff0f2");r.style.setProperty("--panel","#ffffff");r.style.setProperty("--sidebar-bg","#f3cdd3");r.style.setProperty("--danger","#600018");r.style.setProperty("--text","#4b0014");}
 }
+document.getElementById("secretBtn").onclick=()=>{const menu=document.getElementById("themeMenu"); if(menu.style.display==="block"){closeThemeMenu();}else{menu.style.display="block";resetThemeMenuTimer();}};
+function resetThemeMenuTimer(){clearTimeout(themeMenuTimer);themeMenuTimer=setTimeout(closeThemeMenu,10000);}
+function closeThemeMenu(){document.getElementById("themeMenu").style.display="none";clearTimeout(themeMenuTimer);}
 
-/* ----------- 🔥 Vérif CSV du jour pour "Temp" ----------- */
-async function checkTraçaTempToday(parentLi, tracatempId) {
-  const today = new Date();
-  const yyyymmdd =
-    today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, "0") +
-    String(today.getDate()).padStart(2, "0");
+// === Navigation fichiers ===
+function updateNavButtons(){
+  document.getElementById("prevFile").disabled = (currentIndex >= csvFilesList.length-1);
+  document.getElementById("nextFile").disabled = (currentIndex <= 0);
+}
+document.getElementById("prevFile").onclick=()=>{ if(currentIndex < csvFilesList.length-1){ const f=csvFilesList[currentIndex+1]; if(f){localStorage.setItem("csvFileIndex",currentIndex+1);window.location.href=`viewer.html?fileId=${f.id}&fileName=${encodeURIComponent(f.name)}`;}}};
+document.getElementById("nextFile").onclick=()=>{ if(currentIndex > 0){ const f=csvFilesList[currentIndex-1]; if(f){localStorage.setItem("csvFileIndex",currentIndex-1);window.location.href=`viewer.html?fileId=${f.id}&fileName=${encodeURIComponent(f.name)}`;}}};
+document.getElementById("backBtn").onclick=()=>window.close();
 
-  const files = await fetchFolderContents(tracatempId);
-  // accepter tout CSV contenant la date du jour
-  const todayFile = files.find(f => f.name.includes(yyyymmdd) && f.name.endsWith(".csv"));
-  if (!todayFile) return;
+// === Spinner ===
+function showLoading(){ document.getElementById('loadingOverlay').style.display='block'; }
+function hideLoading(){ document.getElementById('loadingOverlay').style.display='none'; }
 
+// === Charger CSV ===
+async function loadCSV(){
+  const fileId=new URLSearchParams(window.location.search).get('fileId');
+  const fileName=new URLSearchParams(window.location.search).get('fileName');
+  const fileNameDiv=document.getElementById('fileName');
+  const lineCountDiv=document.getElementById('lineCount');
+  const container=document.getElementById('tableContainer');
+  if(!fileId) return;
+
+  fileNameDiv.textContent=fileName||''; 
+  fileNameDiv.style.display='block'; 
+  lineCountDiv.style.display='block';
+
+  const url=`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
+  showLoading();
   try {
-    const url = `https://www.googleapis.com/drive/v3/files/${todayFile.id}?alt=media&key=${API_KEY}`;
-    const res = await fetch(url);
-    const text = await res.text();
+    const response=await fetch(url);
+    if(!response.ok) throw new Error("HTTP " + response.status);
 
-    // lire les dernières lignes
-    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-    const lastLine = lines[lines.length - 1];
-    if (!lastLine) return;
+    const blob=await response.blob();
+    const arrayBuffer=await blob.arrayBuffer();
+    let text;
+    try{ text=new TextDecoder('windows-1252').decode(arrayBuffer); }
+    catch{ text=new TextDecoder('utf-8').decode(arrayBuffer); }
 
-    // Nettoyage : enlever guillemets et espaces
-    const cols = lastLine.split(",").map(c => c.replace(/"/g, "").trim());
+    const results=Papa.parse(text,{header:false,skipEmptyLines:true});
+    currentData=results.data;
+    const rowCount=currentData.length>1?currentData.length-1:0;
+    lineCountDiv.textContent=rowCount+" ligne"+(rowCount!==1?"s":"");
+    renderTable(currentData);
+  } catch(err){
+    console.error("Erreur:",err);
+    container.innerHTML=`
+      <div style="padding:20px; background:#ffccbc; color:#d84315; border-radius:8px; font-weight:bold;">
+        ⚠️ Impossible de charger le fichier CSV.<br>
+        Cause probable : restriction Google Drive (CORS) ou problème réseau.<br>
+        <button id="retryBtn" style="margin-top:10px; background:#e64a19; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">
+          🔄 Réessayer
+        </button>
+      </div>`;
+    const retry=document.getElementById("retryBtn");
+    if(retry){ retry.onclick=()=>{container.innerHTML="⏳ Nouvelle tentative...";loadCSV();}; }
+  } finally {
+    hideLoading();
+    updateNavButtons();
+  }
+}
 
-    const v4 = parseFloat(cols[3]);
-    const v6 = parseFloat(cols[5]);
+// === Utils ===
+function escapeHtml(str){ return (str==null?'':String(str)).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 
-    if ((v4 && v4 > FLAME_THRESHOLD) || (v6 && v6 > FLAME_THRESHOLD)) {
-      markFolderWithFlame(parentLi);
+// === Rendu tableau + toggles colonnes ===
+function renderTable(data){
+  let html='<table id="csvTable">';
+
+  // Détecter si c’est un fichier Z...
+  const fileName=document.getElementById('fileName').textContent||"";
+  const isZfile=fileName.startsWith("Z");
+
+  // Ligne d’en-tête : index 2 pour Z..., sinon index 0
+  const headerRowIndex=isZfile?2:0;
+
+  if(data.length>headerRowIndex){
+    html+='<thead><tr>';
+    data[headerRowIndex].forEach((cell,index)=>{
+      const cls=(index===sortColIndex)?(sortAsc?"sorted-desc":"sorted-asc"):"";
+      html+=`<th class="${cls}" onclick="sortTable(${index})">${escapeHtml((cell??'').toString().trim())}</th>`;
+    });
+    html+='</tr></thead>';
+  }
+
+  html+='<tbody>';
+  for(let i=headerRowIndex+1;i<data.length;i++){
+    html+='<tr>';
+    data[i].forEach((cell,index)=> html+=`<td>${escapeHtml((cell??'').toString().trim())}</td>`);
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  document.getElementById('tableContainer').innerHTML=html;
+
+  // Panneau de toggles colonnes (reconstruit à chaque rendu)
+  const toggleContainer=document.getElementById('columnToggles');
+  toggleContainer.innerHTML=`<label style="font-weight:bold;"><input type="checkbox" id="selectAll" /> Tout</label>
+                             <label style="font-weight:bold;"><input type="checkbox" id="selectNone" /> Aucune</label>`;
+  visibleColumns = {};
+
+  if(data.length>headerRowIndex){
+    data[headerRowIndex].forEach((cell,index)=>{
+      const colName=(cell??'').toString().trim();
+      const id=`colToggle${index}`;
+      const checked = (columnVisibilityMemory[colName] !== false); 
+      visibleColumns[index]=checked;
+      toggleContainer.innerHTML += `<label><input type="checkbox" id="${id}" data-col="${index}" ${checked?"checked":""} /> ${escapeHtml(colName)}</label>`;
+    });
+
+    // === RÈGLE SPÉCIALE POUR LES FICHIERS Z ===
+    if(isZfile){
+      const allowed=[0,1,2,8]; // colonnes 1,2,3,9 visibles par défaut
+      Object.keys(visibleColumns).forEach(i=>{
+        const keep=allowed.includes(Number(i));
+        visibleColumns[i]=keep;
+        const headerName=(currentData[headerRowIndex][i]??'').toString().trim();
+        columnVisibilityMemory[headerName]=keep;
+        const cb=document.getElementById(`colToggle${i}`);
+        if(cb) cb.checked=keep;
+      });
+      localStorage.setItem(VIS_MEM_KEY, JSON.stringify(columnVisibilityMemory));
     }
+    // === FIN RÈGLE SPÉCIALE ===
 
-  } catch (e) {
-    console.error("Erreur lecture CSV dans Temp", e);
+    // Écouteurs toggles individuels
+    toggleContainer.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+      const colIndex=cb.dataset.col;
+      if(colIndex!==undefined){
+        cb.addEventListener('change',()=>{
+          toggleColumn(Number(colIndex), cb.checked);
+          const headerName=(currentData[headerRowIndex][colIndex]??'').toString().trim();
+          columnVisibilityMemory[headerName]=cb.checked;
+          localStorage.setItem(VIS_MEM_KEY, JSON.stringify(columnVisibilityMemory));
+        });
+      }
+    });
+
+    // Tout / Aucune
+    const all=document.getElementById('selectAll');
+    const none=document.getElementById('selectNone');
+    if(all){
+      all.addEventListener('change',e=>{
+        const on=e.target.checked;
+        document.querySelectorAll('#columnToggles input[type="checkbox"]').forEach(cb=>{
+          if(cb.dataset.col!==undefined){
+            cb.checked=on;
+            const idx=Number(cb.dataset.col);
+            toggleColumn(idx,on);
+            const headerName=(currentData[headerRowIndex][idx]??'').toString().trim();
+            columnVisibilityMemory[headerName]=on;
+          }
+        });
+        localStorage.setItem(VIS_MEM_KEY, JSON.stringify(columnVisibilityMemory));
+        if(none) none.checked=false;
+      });
+    }
+    if(none){
+      none.addEventListener('change',e=>{
+        const off=e.target.checked;
+        document.querySelectorAll('#columnToggles input[type="checkbox"]').forEach(cb=>{
+          if(cb.dataset.col!==undefined){
+            cb.checked=!off;
+            const idx=Number(cb.dataset.col);
+            toggleColumn(idx,!off);
+            const headerName=(currentData[headerRowIndex][idx]??'').toString().trim();
+            columnVisibilityMemory[headerName]=!off;
+          }
+        });
+        localStorage.setItem(VIS_MEM_KEY, JSON.stringify(columnVisibilityMemory));
+        if(all) all.checked=false;
+      });
+    }
+  }
+
+  // Appliquer visibilité mémorisée
+  Object.keys(visibleColumns).forEach(i=>toggleColumn(Number(i), visibleColumns[i], true));
+
+  // Si une colonne numérique a été colorisée précédemment, réappliquer
+  if(lastColorizedColIndex!=null){
+    if(currentData[headerRowIndex] && currentData[headerRowIndex][lastColorizedColIndex]!==undefined){
+      colorizeColumn(lastColorizedColIndex);
+    }
+  }
+
+  // Réappliquer filtre si présent
+  if(lastSearchQuery!==""){
+    const q=lastSearchQuery;
+    document.getElementById("searchInput").value=q;
+    document.querySelectorAll("#csvTable tbody tr").forEach(row=>{
+      row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';
+    });
   }
 }
 
-function markFolderWithFlame(li) {
-  const span = li.querySelector(".folder-name");
-  if (span && !span.classList.contains("has-flame")) {
-    span.classList.add("has-flame");
-    span.innerHTML = `<span class="flame">🔥</span> ` + span.innerHTML;
+
+function toggleColumn(colIndex, visible, skipMemoryUpdate=false){
+  visibleColumns[colIndex]=visible;
+  const table=document.getElementById('csvTable');
+  if(!table) return;
+  table.querySelectorAll('tr').forEach(row=>{
+    const cell=row.children[colIndex];
+    if(cell) cell.style.display=visible?'':'none';
+  });
+  if(!skipMemoryUpdate){
+    const headerName=(currentData[0][colIndex]??'').toString().trim();
+    columnVisibilityMemory[headerName]=visible;
+    localStorage.setItem(VIS_MEM_KEY, JSON.stringify(columnVisibilityMemory));
   }
-  if (li.parentElement && li.parentElement.closest("li")) {
-    markFolderWithFlame(li.parentElement.closest("li"));
+}
+
+// === Détection type ===
+function detectType(val){
+  if(val===null || val===undefined) return 'string';
+  const s=String(val).trim();
+  if(s!=='' && !isNaN(Number(s))) return 'number';
+  const d=new Date(s);
+  if(!isNaN(d.getTime())) return 'date';
+  return 'string';
+}
+
+// === Colorisation colonne numérique (15-70, colonnes contenant "SONDE", "TEMP" ou "T°C") ===
+function colorizeColumn(colIndex) {
+  const table = document.getElementById("csvTable");
+  if (!table) return;
+
+  // Vérifier le nom d'en-tête
+  const headerName = (currentData[0][colIndex] ?? "").toString().toUpperCase();
+  if (
+    !headerName.includes("SONDE") &&
+    !headerName.includes("TEMP") &&
+    !headerName.includes("T°C")
+  ) {
+    return; // pas de coloration si le titre n'a aucun mot clé
   }
+
+  const cells = [...table.querySelectorAll("tbody tr")].map(r => r.children[colIndex]).filter(Boolean);
+
+  const minVal = 15;
+  const maxVal = 70;
+
+  cells.forEach(cell => {
+    const v = parseFloat(cell.textContent.replace(",", "."));
+    if (!isNaN(v)) {
+      // Normaliser entre 0 et 1 sur la plage 15–70
+      let t = (v - minVal) / (maxVal - minVal);
+      t = Math.max(0, Math.min(1, t));
+
+      let r, g, b;
+
+      if (t < 0.5) {
+        // 15 → 42 : bleu clair → vert
+        const ratio = t / 0.5;
+        r = 0;
+        g = Math.round(150 + (255 - 150) * ratio);
+        b = Math.round(255 - 255 * ratio);
+      } else if (t < 0.75) {
+        // 42 → 56 : vert → jaune
+        const ratio = (t - 0.5) / 0.25;
+        r = Math.round(255 * ratio);
+        g = 255;
+        b = 0;
+      } else if (t < 0.9) {
+        // 56 → 63 : jaune → orange
+        const ratio = (t - 0.75) / 0.15;
+        r = 255;
+        g = Math.round(255 - 90 * ratio);
+        b = 0;
+      } else {
+        // 63 → 70 : orange → rouge
+        const ratio = (t - 0.9) / 0.1;
+        r = 255;
+        g = Math.round(165 - 165 * ratio);
+        b = 0;
+      }
+
+      cell.style.backgroundColor = `rgb(${r},${g},${b})`;
+      cell.style.color = "#000"; // noir pour contraste
+    } else {
+      cell.style.backgroundColor = "";
+      cell.style.color = "";
+    }
+  });
+
+  lastColorizedColIndex = colIndex;
 }
 
 
 
-/* ----------- Init ----------- */
+
+// === Tri (avec coloration auto si numérique) ===
+function sortTable(colIndex){
+  const header=currentData[0];
+  const body=currentData.slice(1);
+  const firstVal = body.find(r=>r[colIndex]!=null)?.[colIndex] ?? '';
+  const type=detectType(firstVal);
+
+  body.sort((a,b)=>{
+    let valA=a[colIndex]??'', valB=b[colIndex]??'';
+    if(type==='number'){ return sortAsc? (Number(valA)-Number(valB)) : (Number(valB)-Number(valA)); }
+    if(type==='date'){ return sortAsc? new Date(valA)-new Date(valB): new Date(valB)-new Date(valA); }
+    valA=String(valA).toLowerCase(); valB=String(valB).toLowerCase();
+    return sortAsc? valA.localeCompare(valB): valB.localeCompare(valA);
+  });
+
+  columnSortMemory.colName=(header[colIndex]??'').toString().trim();
+  columnSortMemory.asc=sortAsc;
+
+  sortAsc=!sortAsc; sortColIndex=colIndex; currentData=[header,...body];
+  renderTable(currentData);
+
+  if(type==='number'){ colorizeColumn(colIndex); } else { lastColorizedColIndex=null; }
+}
+
+// === Recherche ===
+document.getElementById("searchInput").addEventListener("input",function(){
+  lastSearchQuery=this.value.toLowerCase();
+  document.querySelectorAll("#csvTable tbody tr").forEach(row=>{
+    row.style.display=row.textContent.toLowerCase().includes(lastSearchQuery)?'':'none';
+  });
+});
+
+// === Réinitialiser ===
+document.getElementById("resetBtn").addEventListener("click",()=>{
+  document.getElementById("searchInput").value=""; lastSearchQuery="";
+  sortAsc=true; sortColIndex=null; columnSortMemory={colName:null,asc:true};
+  columnVisibilityMemory={}; localStorage.removeItem(VIS_MEM_KEY);
+  lastColorizedColIndex=null;
+
+  if(currentData.length>0){
+    currentData=[currentData[0], ...currentData.slice(1)];
+    renderTable(currentData);
+  }
+  const tableContainer=document.getElementById("tableContainer");
+  tableContainer.classList.remove("flash-red"); void tableContainer.offsetWidth; tableContainer.classList.add("flash-red");
+});
+
+// === Afficher / Masquer colonnes (persistance panneau) ===
+const toggleBtn=document.getElementById('toggleColumnsBtn');
+const toggles=document.getElementById('columnToggles');
+toggleBtn.setAttribute('aria-controls','columnToggles');
+if(localStorage.getItem('columnTogglesOpen')==='1'){ toggles.classList.add('open'); toggleBtn.setAttribute('aria-expanded','true'); }
+else{ toggleBtn.setAttribute('aria-expanded','false'); }
+toggleBtn.addEventListener('click',()=>{
+  const isOpen=toggles.classList.toggle('open');
+  toggleBtn.setAttribute('aria-expanded', isOpen ? 'true':'false');
+  localStorage.setItem('columnTogglesOpen', isOpen ? '1':'0');
+});
+
+// === Export Excel ===
+document.getElementById("exportExcel").addEventListener("click",()=>{
+  if(currentData.length===0) return;
+  let csvName=(document.getElementById('fileName').textContent||'').replace(/\.csv$/i,"");
+  let excelFileName=csvName+".xlsx";
+  const match=csvName.match(/^SA(\d+)_([0-9]{8})$/);
+  if(match){
+    const numRaw=match[1]; const numTwoDigits=parseInt(numRaw,10).toString().padStart(2,"0");
+    const dateRaw=match[2]; excelFileName=`Séchoir-${numTwoDigits}_${dateRaw}.xlsx`;
+  }
+  const ws=XLSX.utils.aoa_to_sheet(currentData);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Sheet1");
+  XLSX.writeFile(wb,excelFileName);
+});
+
+// === Export PDF ===
+document.getElementById("exportPDF").addEventListener("click",()=>{
+  if(currentData.length===0) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Récupérer le chemin complet depuis l’URL
+  let fullPath = new URLSearchParams(window.location.search).get('fileName') || "";
+  let parts = fullPath.split(/[\\/]/);
+  let csvName = parts.pop() || "";
+
+  // Extraire 2 dossiers parents si dispos
+  let parents = "";
+  if(parts.length >= 2){
+    parents = parts.slice(-2).join(" / ");
+  } else if(parts.length === 1){
+    parents = parts[0];
+  }
+
+  // Construire titre lisible + nom fichier PDF
+  let titleText = csvName.replace(/\.csv$/i,"");
+  let pdfFileName = csvName.replace(/\.csv$/i,".pdf");
+
+  if(csvName.startsWith("Z")){
+    const matchZ = csvName.match(/^Z\d+(\d{2})_(\d{8})/);
+    if(matchZ){
+      const xx = parseInt(matchZ[1],10);
+      const d = matchZ[2];
+      const numTwoDigits = String(xx).padStart(2,'0');
+      titleText = `Historique Séchoir ${xx} - ${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
+      pdfFileName = `Historique_Séchoir${numTwoDigits}_${d}.pdf`;
+    }
+  } else {
+    const match = csvName.match(/^SA(\d+)_([0-9]{8})/);
+    if(match){
+      const num = parseInt(match[1],10);
+      const d = match[2];
+      titleText = num>0 ? `Séchoir ${num} - ${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`
+                        : `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
+      const numTwoDigits = String(num).padStart(2,'0');
+      pdfFileName = num>0 ? `Séchoir-${numTwoDigits}_${d}.pdf` : `${d}.pdf`;
+    }
+  }
+
+  // Couleur danger du thème actif
+  function getCSSVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function hexToRgb(hex){
+    hex = hex.replace("#","");
+    if(hex.length===3){hex = hex.split("").map(c=>c+c).join("");}
+    const bigint = parseInt(hex,16);
+    return {r:(bigint>>16)&255, g:(bigint>>8)&255, b:bigint&255};
+  }
+  const danger = getCSSVar('--danger') || '#d84315';
+  const {r,g,b} = hexToRgb(danger);
+
+  // Écrire titre + 2 parents si présents
+  doc.setFontSize(14);
+  doc.setTextColor(r,g,b);
+
+  let finalTitle = titleText;
+  if(parents){
+    finalTitle = parents + " / " + titleText;
+  }
+
+  const lines = doc.splitTextToSize(finalTitle, pageWidth - 40);
+  doc.text(lines, 40, 40);
+
+  // Contenu du tableau
+  const visibleIdx = Object.keys(visibleColumns)
+    .filter(i => visibleColumns[i])
+    .map(i => parseInt(i));
+
+  let head, body;
+  if (csvName.startsWith("Z")) {
+    // Pour Z... : en-têtes sur la 3ème ligne (index 2)
+    head = [ visibleIdx.map(i => String(currentData[2][i] ?? "")) ];
+    body = currentData.slice(3).map(r => visibleIdx.map(i => String(r[i] ?? "")) );
+  } else {
+    // Cas normal : en-têtes sur la 1ère ligne (index 0)
+    head = [ visibleIdx.map(i => String(currentData[0][i] ?? "")) ];
+    body = currentData.slice(1).map(r => visibleIdx.map(i => String(r[i] ?? "")) );
+  }
+
+  doc.autoTable({
+    head,
+    body,
+    startY:60,
+    styles:{fontSize:8, cellPadding:3},
+    headStyles:{fillColor:[r,g,b]}  // couleur thème
+  });
+
+  doc.save(pdfFileName);
+});
+// === Init ===
 window.onload=()=>{
-  updateNetworkStatus();
-  const savedTheme=localStorage.getItem("selectedTheme")||"orange";
+  const savedTheme=localStorage.getItem("selectedTheme")||"orange"; 
   setTheme(savedTheme);
-
-  // bouton "Télécharger le dossier" caché par défaut tant qu'aucun contenu
-  document.getElementById("downloadFolderBtn").style.display="none";
-
-  loadRootFolders();
-  const last=localStorage.getItem('lastFolderId');
-  if(last){
-    const temp={dataset:{id:last}, querySelector:()=>({classList:{add:()=>{}}})};
-    loadFolderFilesOnClick(temp);
-  }
+  loadCSV();
+  updateNavButtons();
 };
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
