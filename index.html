@@ -482,10 +482,28 @@ function displayFiles(files, folderName){
 
     if((filterStartDate && date<filterStartDate) || (filterEndDate && date>filterEndDate)) continue;
 
-    const tr=document.createElement('tr');
-    const tdDate=document.createElement('td'); tdDate.textContent=date||'';
-    const tdName=document.createElement('td'); tdName.textContent=f.name;
-    const tdFolder=document.createElement('td'); tdFolder.textContent=folderName;
+const tr=document.createElement('tr');
+
+// Bloc DATE avec affichage du jour
+const tdDate=document.createElement('td');
+if (date) {
+  const d = new Date(date);
+  const jours = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+  const jourNom = jours[d.getDay()];
+  tdDate.textContent = `${date} (${jourNom})`;
+
+  // Week-end → rouge + gras
+  if (d.getDay() === 0 || d.getDay() === 6) {
+    tdDate.style.color = "var(--danger)";
+    tdDate.style.fontWeight = "bold";
+  }
+} else {
+  tdDate.textContent = '';
+}
+
+const tdName=document.createElement('td'); tdName.textContent=f.name;
+const tdFolder=document.createElement('td'); tdFolder.textContent=folderName;
+
     const tdSize = document.createElement('td');
     if (f.size) {
       tdSize.textContent = formatSize(f.size);
@@ -837,40 +855,3 @@ window.onload=()=>{
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
