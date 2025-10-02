@@ -449,9 +449,13 @@ try {
 // fallback : si aucun dossier trouvé, afficher au moins le nom du fichier
 if (!title) title = baseFileName;
 
-// 🔥 transformer les flammes en span animé
-const flameTitle = title.replace(/🔥/g, '<span class="flame">🔥</span>');
+// 🔥 transformer les flammes en span animé avec tooltip
+const flameTitle = title.replace(
+  /🔥/g,
+  '<span class="flame" title="Brûleur(s) actuellement en fonctionnement">🔥</span>'
+);
 document.getElementById("currentFolderName").innerHTML = flameTitle;
+
 
   }
 } catch(e) {
