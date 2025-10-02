@@ -33,7 +33,7 @@ body{
 .header .logo{height:60px; width:auto;}
 #fileNameContainer{position:absolute; right:0; top:0; text-align:right;}
 #fileName,#lineCount{color:var(--danger);}
-#fileName{font-size:24px; font-weight:bold; white-space:nowrap; max-width:300px; overflow:hidden; text-overflow:ellipsis; display:none;}
+#fileName{font-size:24px; font-weight:bold; white-space:nowrap; max-width:500px; overflow:hidden; text-overflow:ellipsis; display:none;}
 #lineCount{font-size:12px; display:none;}
 
 /* Controls */
@@ -106,17 +106,47 @@ thead th.sorted-desc::after{content:" ▼"; font-size:10px;}
 #loadingOverlay{position:fixed; inset:0; background:rgba(0,0,0,0.05); display:none; z-index:2500;}
 #spinner{position:absolute; top:50%; left:50%; width:40px; height:40px; margin:-20px 0 0 -20px; border:6px solid #f3f3f3; border-top:6px solid var(--accent); border-radius:50%; animation:spin .8s linear infinite;}
 @keyframes spin{from{transform:rotate(0deg);} to{transform:rotate(360deg);}}
+
+/* Effet flamme animée */
+.flame {
+  display: inline-block;
+  animation: flicker 1s infinite alternate;
+}
+@keyframes flicker {
+  0%   { transform: scale(1) rotate(0deg); opacity: 1; }
+  25%  { transform: scale(1.1) rotate(-5deg); opacity: 0.9; }
+  50%  { transform: scale(0.9) rotate(5deg); opacity: 0.8; }
+  75%  { transform: scale(1.05) rotate(-3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
+}
+
+#currentFolderName {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  font-size: 28px;           /* assez gros */
+  font-weight: bold;
+  color: var(--accent);      /* couleur du thème */
+  white-space: nowrap;
+  max-width: 500px;          /* limite largeur */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
 </style>
 </head>
 <body>
 
 <div class="header">
+  <div id="currentFolderName"></div> <!-- 💡 nouveau bloc dossier -->
   <img src="img/logo.png" alt="Logo SMES France" class="logo" id="mainLogo"/>
   <div id="fileNameContainer">
     <div id="fileName"></div>
     <div id="lineCount"></div>
   </div>
 </div>
+
 
 <div class="controls">
   <button id="backBtn">⬅️ Retour</button>
@@ -204,9 +234,55 @@ async function loadCSV(){
   const container=document.getElementById('tableContainer');
   if(!fileId) return;
 
-  fileNameDiv.textContent=fileName||''; 
+  // 🔥 transformer les flammes en <span> animé (fichier)
+const flameTitle = (fileName||'').replace(
+  /🔥/g,
+  '<span class="flame" title="Brûleur(s) actuellement en fonctionnement">🔥</span>'
+);
+fileNameDiv.innerHTML = flameTitle;
+
+
   fileNameDiv.style.display='block'; 
   lineCountDiv.style.display='block';
+
+  // 💡 afficher dossier courant + parent racine (si dispo) sans appel API
+  try {
+    const list = JSON.parse(localStorage.getItem("csvFilesList") || "[]");
+    const f = list.find(x => x.id === fileId);
+
+    if (f) {
+      let title = "";
+
+      if (f.parents && f.parents.length) {
+        const parent = list.find(x => x.id === f.parents[0]);
+        if (parent && parent.name) {
+          title = parent.name;
+
+          if (parent.parents && parent.parents.length) {
+            const root = list.find(x => x.id === parent.parents[0]);
+            if (root && root.name) {
+              title = root.name + " / " + parent.name;
+            }
+          }
+        }
+      }
+
+      if (!title) title = fileName;
+
+      // 🔥 transformer flamme en span animé
+const flameFolder = title.replace(
+  /🔥/g,
+  '<span class="flame" title="Brûleur(s) actuellement en fonctionnement">🔥</span>'
+);
+document.getElementById("currentFolderName").innerHTML = flameFolder;
+
+    }
+  } catch(e) {
+    console.warn("Impossible de récupérer le titre dossier", e);
+  }
+
+
+
 
   const url=`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
   showLoading();
@@ -230,7 +306,7 @@ async function loadCSV(){
     container.innerHTML=`
       <div style="padding:20px; background:#ffccbc; color:#d84315; border-radius:8px; font-weight:bold;">
         ⚠️ Impossible de charger le fichier CSV.<br>
-        Restriction Google Drive: Réessayer plus tard<br>
+        Cause probable : restriction Google Drive (CORS) ou problème réseau.<br>
         <button id="retryBtn" style="margin-top:10px; background:#e64a19; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">
           🔄 Réessayer
         </button>
@@ -652,7 +728,6 @@ window.onload=()=>{
 </script>
 </body>
 </html>
-
 
 
 
