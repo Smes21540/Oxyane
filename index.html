@@ -446,16 +446,70 @@ async function fetchChildren(folderId){
 
 async function loadFolderFilesOnClick(li){
   await toggleFolder(li);
+
+  // Réinitialiser la sélection visuelle
   document.querySelectorAll('#folderTree li span.folder-name').forEach(s=>s.classList.remove('active-folder'));
-  const nameSpan=li.querySelector('span.folder-name');
-  if(nameSpan){ nameSpan.classList.add('active-folder'); }
+  const nameSpan = li.querySelector('span.folder-name');
+  if(nameSpan){ 
+    nameSpan.classList.add('active-folder'); 
+  }
   localStorage.setItem('lastFolderId', li.dataset.id);
 
+  const folderName = nameSpan ? nameSpan.textContent.toLowerCase() : "";
+
+  // ⚡ Gestion spéciale Z3
+  if (folderName.includes("traça_temp") || folderName.includes("traca_temp")) {
+    // récupérer le dossier parent (= site)
+    const siteLi = li.parentElement.closest("li");
+    if (siteLi && siteLi.dataset.id) {
+      const siblings = await fetchFolderContents(siteLi.dataset.id);
+      const hist = siblings.find(s => 
+        s.mimeType === 'application/vnd.google-apps.folder' && 
+        s.name.toLowerCase().includes("historique")
+      );
+
+      if (hist) {
+        const histFiles = await fetchFolderContents(hist.id);
+        const z3Files = histFiles.filter(ff => 
+          ff.name.toUpperCase().startsWith("Z3") && 
+          ff.name.toLowerCase().endsWith(".csv")
+        );
+        localStorage.setItem("csvZ3Files", JSON.stringify(z3Files));
+        console.log("[Z3] Préchargés depuis Historique voisin:", z3Files.length);
+      } else {
+        localStorage.removeItem("csvZ3Files");
+        console.warn("[Z3] Aucun dossier Historique trouvé pour", nameSpan.textContent);
+      }
+    }
+  } 
+  else if (folderName.includes("historique")) {
+    // directement charger les Z3 de ce dossier
+    const histFiles = await fetchFolderContents(li.dataset.id);
+    const z3Files = histFiles.filter(ff => 
+      ff.name.toUpperCase().startsWith("Z3") && 
+      ff.name.toLowerCase().endsWith(".csv")
+    );
+    localStorage.setItem("csvZ3Files", JSON.stringify(z3Files));
+    console.log("[Z3] Préchargés directement (Historique):", z3Files.length);
+  } 
+  else {
+    // Sinon → effacer le cache Z3
+    localStorage.removeItem("csvZ3Files");
+    console.log("[Z3] Cache vidé (hors Traça_Temp / Historique)");
+  }
+
+  // Charger fichiers CSV/JPG classiques du dossier
   const files = await fetchFolderContents(li.dataset.id);
-  const filtered = files.filter(f => f.name.toLowerCase().endsWith('.csv') || f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.jpeg'));
+  const filtered = files.filter(f => 
+    f.name.toLowerCase().endsWith('.csv') || 
+    f.name.toLowerCase().endsWith('.jpg') || 
+    f.name.toLowerCase().endsWith('.jpeg')
+  );
   imageFiles = filtered.filter(f => /\.(jpg|jpeg)$/i.test(f.name)); // pour la modale
   displayFiles(filtered, nameSpan ? nameSpan.textContent : '');
 }
+
+
 
 function displayFiles(files, folderName){
   const tbody=document.querySelector('#csvTable tbody');
