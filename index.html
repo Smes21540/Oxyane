@@ -318,8 +318,7 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
 
 <script>
 /* ----------- Config Drive ----------- */
-const API_KEY="AIzaSyCbEV3CS9bOcxq5eK-QXbjczGHjvzyXS6M";
-const ROOT_FOLDER_ID="18QkQPyCZxTCAaoz_qd1wAelmQbSE4ex8";
+const ROOT_FOLDER_ID="1KsgiC3ZFg_1XKOTulcZT8nkxPvG-xxjM";
 
 /* ----------- Config personnalisée ----------- */
 const FLAME_THRESHOLD = 40.0;   // seuil déclencheur de la flamme 🔥
@@ -328,6 +327,8 @@ const FLAME_THRESHOLD = 40.0;   // seuil déclencheur de la flamme 🔥
 let imageFiles=[], currentImageIndex=0;
 let filterStartDate="", filterEndDate="";
 let themeMenuTimer;
+let cancelScan = false; // 🛑 permet d’arrêter le scan si on clique ailleurs
+
 
 /* ----------- Utilitaires UI ----------- */
 const spinner=document.getElementById('spinner');
@@ -360,20 +361,44 @@ async function fetchFolderContents(folderId){
   if(!navigator.onLine){updateNetworkStatus();return [];}
   showSpinner();
   try{
-    const res=await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&key=${API_KEY}&fields=files(id,name,mimeType,size,createdTime,modifiedTime)`);
-    const data=await res.json();
-    if(data.error){
-      alert("Erreur Drive: "+data.error.message);
-      console.error("Drive error:", data.error);
+    const res = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?list=true&id=${folderId}&site=Smes_Accè`);
+
+    // 🚫 Blocage abonnement
+    if (res.status === 403) {
+      alert("⛔ Accès suspendu : merci de régulariser votre abonnement.");
+      hideSpinner();
       return [];
     }
-    return data.files||[];
-  }catch(e){
-    console.error("Erreur Drive:",e);
-    alert("Impossible de charger le dossier (réseau/API). Ouvre la console pour le détail.");
+
+    // 🔎 Autre erreur HTTP
+    if (!res.ok) {
+      console.error("Erreur proxy Drive:", res.status, res.statusText);
+      alert("Erreur réseau ou proxy. Vérifie ta connexion ou ton accès.");
+      hideSpinner();
+      return [];
+    }
+
+    // ✅ Lecture JSON si tout va bien
+    const data = await res.json();
+    if (data.error) {
+      console.error("Erreur Google Drive API:", data.error);
+      alert("Erreur Drive (proxy). Ouvre la console pour le détail.");
+      hideSpinner();
+      return [];
+    }
+
+    return data.files || [];
+
+  } catch(e){
+    console.error("Erreur Drive:", e);
+    alert("Erreur interne ou blocage d’accès (proxy).");
     return [];
-  }finally{hideSpinner();}
+  } finally{
+    hideSpinner();
+  }
 }
+
+
 
 async function loadRootFolders(){
   const files = await fetchFolderContents(ROOT_FOLDER_ID);
@@ -582,7 +607,64 @@ if (date) {
   tdDate.textContent = '';
 }
 
-const tdName=document.createElement('td'); tdName.textContent=f.name;
+const tdName = document.createElement('td');
+tdName.textContent = f.name;
+
+// === FLAMME FILE (avec cancelScan) ===
+if (f.name.toLowerCase().endsWith(".csv") &&
+    (folderName.toLowerCase().includes("traça_temp") || folderName.toLowerCase().includes("traca_temp"))) {
+  
+  // Message provisoire
+  tdName.innerHTML = `${f.name}&nbsp;&nbsp;&nbsp;<span style="color:gray;font-size:11px;">(scan en cours...)</span>`;
+
+  (async () => {
+    try {
+      if (cancelScan) { tdName.innerHTML = f.name; return; } // 🛑 stop si demandé
+
+      const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accè`;
+
+      const res = await fetch(url);
+      if (!res.ok) { tdName.innerHTML = f.name; return; }
+
+      const text = await res.text();
+      if (cancelScan) { tdName.innerHTML = f.name; return; } // 🛑 stop si demandé
+
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+      if (lines.length < 2) { tdName.innerHTML = f.name; return; }
+
+      const headers = lines[0].split(",").map(h => h.replace(/"/g,"").trim().toLowerCase());
+      let idxInf = headers.map((h,i)=>({h,i})).filter(o=>o.h.includes("sonde ac inf"))[1]?.i;
+      let idxSup = headers.map((h,i)=>({h,i})).filter(o=>o.h.includes("sonde ac sup"))[1]?.i;
+
+      if (idxInf === undefined && idxSup === undefined) { tdName.innerHTML = f.name; return; }
+
+      let countFlame = 0;
+      for (let i = 1; i < lines.length; i++) {
+        if (cancelScan) { tdName.innerHTML = f.name; return; } // 🛑 stop en plein scan
+        const cols = lines[i].split(",").map(c => c.replace(/"/g,"").trim());
+        const vInf = idxInf !== undefined ? parseFloat(cols[idxInf]) : NaN;
+        const vSup = idxSup !== undefined ? parseFloat(cols[idxSup]) : NaN;
+        if ((isFinite(vInf) && vInf > FLAME_THRESHOLD) ||
+            (isFinite(vSup) && vSup > FLAME_THRESHOLD)) {
+          countFlame++;
+        }
+      }
+
+      if (countFlame >= 1) {
+        tdName.innerHTML = `${f.name}&nbsp;&nbsp;&nbsp;<span class="flame" title="Brûleur actif détecté">🔥</span>`;
+      } else {
+        tdName.innerHTML = f.name;
+      }
+    } catch(e) {
+      console.error("Erreur flamme fichier:", f.name, e);
+      tdName.innerHTML = f.name;
+    }
+  })();
+}
+// === FIN FLAMME FILE ===
+
+
+
 const tdFolder=document.createElement('td'); tdFolder.textContent=folderName;
 
     const tdSize = document.createElement('td');
@@ -630,6 +712,8 @@ if(f.name.toLowerCase().endsWith('.csv')){
 
 /* ----------- Open viewer (CSV list + index) ----------- */
 async function openViewer(viewer, id, name){
+  cancelScan = true; // 🛑 stoppe immédiatement tous les scans
+
   const active = document.querySelector('#folderTree .active-folder');
   if (!active) { alert("Sélectionnez un dossier !"); return; }
 
@@ -641,10 +725,8 @@ async function openViewer(viewer, id, name){
 
   // 🔗 Récupérer les Z3 préchargés
   const z3Files = JSON.parse(localStorage.getItem("csvZ3Files") || "[]");
-
   const allCsv = [...saFiles, ...z3Files];
 
-  // ⚡ Ajouter la hiérarchie de dossiers
   function addFolderHierarchy(li, acc){
     if (!li) return;
     const nameSpan = li.querySelector('.folder-name');
@@ -671,38 +753,29 @@ async function openViewer(viewer, id, name){
   const index = allCsv.findIndex(f => f.id === id);
   localStorage.setItem("csvFileIndex", index);
 
-  console.log("📦 Sauvegardé dans csvFilesList:", allCsv); // debug
+  // 🔍 Vérifier plan_sondes.csv
+  const planFile = files.find(f => f.name.toLowerCase() === "plan_sondes.csv");
+  let url = `${viewer}?fileId=${id}&fileName=${encodeURIComponent(name)}`;
 
-// 🔍 Vérifier si un plan_sondes.csv existe dans ce dossier
-const planFile = files.find(f => f.name.toLowerCase() === "plan_sondes.csv");
-let url = `${viewer}?fileId=${id}&fileName=${encodeURIComponent(name)}`;
+  if (planFile) {
+    try {
+const respPlan = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?id=${planFile.id}&name=${encodeURIComponent(planFile.name)}&site=Smes_Accè`);
 
-if (planFile) {
-  console.log("✅ plan_sondes.csv trouvé :", planFile);
 
-  try {
-    // Charger et stocker le plan dans localStorage
-    const urlPlan = `https://www.googleapis.com/drive/v3/files/${planFile.id}?alt=media&key=${API_KEY}`;
-    const respPlan = await fetch(urlPlan);
-    const textPlan = await respPlan.text();
-    localStorage.setItem("planSondes", textPlan);
-    console.log("📦 plan_sondes.csv stocké dans localStorage");
-  } catch (e) {
-    console.error("❌ Erreur lors du chargement du plan_sondes.csv", e);
+      const textPlan = await respPlan.text();
+      localStorage.setItem("planSondes", textPlan);
+    } catch (e) {
+      console.error("❌ Erreur lors du chargement du plan_sondes.csv", e);
+    }
+  } else {
+    localStorage.removeItem("planSondes");
   }
-} else {
-  console.warn("⚠️ Aucun plan_sondes.csv trouvé dans ce dossier");
-  localStorage.removeItem("planSondes"); // nettoyage si pas de plan
-}
-
-
-  console.log("➡️ URL générée :", url);
 
   window.open(url,'_blank');
+
+  // 🔄 après un petit délai → réautoriser les scans
+  setTimeout(() => { cancelScan = false; }, 1000);
 }
-
-
-
 
 
 
@@ -796,8 +869,10 @@ document.getElementById('downloadFolderBtn').onclick=async()=>{
   for(const f of files){
     if(zipCancelled) return;
     try{
-      const url=`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&key=${API_KEY}`;
-      const res=await fetch(url);
+const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accè`;
+
+const res = await fetch(url);
+
       if(!res.ok) throw new Error('Fetch media failed: '+res.status);
       const blob=await res.blob();
       zip.file(sanitizeFileName(f.name), blob);
@@ -946,8 +1021,10 @@ async function checkTraçaTempToday(parentLi, tracatempId) {
   if (!todayFile) return;
 
   try {
-    const url = `https://www.googleapis.com/drive/v3/files/${todayFile.id}?alt=media&key=${API_KEY}`;
-    const res = await fetch(url);
+const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${todayFile.id}&name=${encodeURIComponent(todayFile.name)}&t=${Date.now()}&site=Smes_Accè`;
+
+const res = await fetch(url);
+
     const text = await res.text();
 
     // lire les dernières lignes
