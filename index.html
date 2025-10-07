@@ -318,7 +318,7 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
 
 <script>
 /* ----------- Config Drive ----------- */
-const ROOT_FOLDER_ID="1KsgiC3ZFg_1XKOTulcZT8nkxPvG-xxjM";
+const ROOT_FOLDER_ID="18QkQPyCZxTCAaoz_qd1wAelmQbSE4ex8";
 
 /* ----------- Config personnalisée ----------- */
 const FLAME_THRESHOLD = 40.0;   // seuil déclencheur de la flamme 🔥
@@ -361,7 +361,7 @@ async function fetchFolderContents(folderId){
   if(!navigator.onLine){updateNetworkStatus();return [];}
   showSpinner();
   try{
-    const res = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?list=true&id=${folderId}&site=Smes_Accè`);
+    const res = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?list=true&id=${folderId}&site=Smes_Accès`);
 
     // 🚫 Blocage abonnement
     if (res.status === 403) {
@@ -621,7 +621,7 @@ if (f.name.toLowerCase().endsWith(".csv") &&
     try {
       if (cancelScan) { tdName.innerHTML = f.name; return; } // 🛑 stop si demandé
 
-      const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accè`;
+      const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accès`;
 
       const res = await fetch(url);
       if (!res.ok) { tdName.innerHTML = f.name; return; }
@@ -759,7 +759,7 @@ async function openViewer(viewer, id, name){
 
   if (planFile) {
     try {
-const respPlan = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?id=${planFile.id}&name=${encodeURIComponent(planFile.name)}&site=Smes_Accè`);
+const respPlan = await fetch(`https://smes21540.netlify.app/.netlify/functions/drive?id=${planFile.id}&name=${encodeURIComponent(planFile.name)}&site=Smes_Accès`);
 
 
       const textPlan = await respPlan.text();
@@ -869,7 +869,7 @@ document.getElementById('downloadFolderBtn').onclick=async()=>{
   for(const f of files){
     if(zipCancelled) return;
     try{
-const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accè`;
+const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Accès`;
 
 const res = await fetch(url);
 
@@ -1021,7 +1021,7 @@ async function checkTraçaTempToday(parentLi, tracatempId) {
   if (!todayFile) return;
 
   try {
-const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${todayFile.id}&name=${encodeURIComponent(todayFile.name)}&t=${Date.now()}&site=Smes_Accè`;
+const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${todayFile.id}&name=${encodeURIComponent(todayFile.name)}&t=${Date.now()}&site=Smes_Accès`;
 
 const res = await fetch(url);
 
