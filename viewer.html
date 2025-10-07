@@ -33,7 +33,7 @@ body{
 .header .logo{height:60px; width:auto;}
 #fileNameContainer{position:absolute; right:0; top:0; text-align:right;}
 #fileName,#lineCount{color:var(--danger);}
-#fileName{font-size:24px; font-weight:bold; white-space:nowrap; max-width:500px; overflow:hidden; text-overflow:ellipsis; display:none;}
+#fileName{font-size:24px; font-weight:bold; white-space:nowrap; max-width:300px; overflow:hidden; text-overflow:ellipsis; display:none;}
 #lineCount{font-size:12px; display:none;}
 
 /* Controls */
@@ -106,47 +106,17 @@ thead th.sorted-desc::after{content:" ▼"; font-size:10px;}
 #loadingOverlay{position:fixed; inset:0; background:rgba(0,0,0,0.05); display:none; z-index:2500;}
 #spinner{position:absolute; top:50%; left:50%; width:40px; height:40px; margin:-20px 0 0 -20px; border:6px solid #f3f3f3; border-top:6px solid var(--accent); border-radius:50%; animation:spin .8s linear infinite;}
 @keyframes spin{from{transform:rotate(0deg);} to{transform:rotate(360deg);}}
-
-/* Effet flamme animée */
-.flame {
-  display: inline-block;
-  animation: flicker 1s infinite alternate;
-}
-@keyframes flicker {
-  0%   { transform: scale(1) rotate(0deg); opacity: 1; }
-  25%  { transform: scale(1.1) rotate(-5deg); opacity: 0.9; }
-  50%  { transform: scale(0.9) rotate(5deg); opacity: 0.8; }
-  75%  { transform: scale(1.05) rotate(-3deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
-}
-
-#currentFolderName {
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  font-size: 28px;           /* assez gros */
-  font-weight: bold;
-  color: var(--accent);      /* couleur du thème */
-  white-space: nowrap;
-  max-width: 500px;          /* limite largeur */
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div id="currentFolderName"></div> <!-- 💡 nouveau bloc dossier -->
   <img src="img/logo.png" alt="Logo SMES France" class="logo" id="mainLogo"/>
   <div id="fileNameContainer">
     <div id="fileName"></div>
     <div id="lineCount"></div>
   </div>
 </div>
-
 
 <div class="controls">
   <button id="backBtn">⬅️ Retour</button>
@@ -185,7 +155,6 @@ thead th.sorted-desc::after{content:" ▼"; font-size:10px;}
 <script src="libs/jspdf.plugin.autotable.min.js"></script>
 <script>
 // === Variables globales ===
-const API_KEY='AIzaSyCbEV3CS9bOcxq5eK-QXbjczGHjvzyXS6M';
 const VIS_MEM_KEY = 'columnVisibilityMemory';
 let currentData=[], sortAsc=true, sortColIndex=null, visibleColumns={},
     columnVisibilityMemory = JSON.parse(localStorage.getItem(VIS_MEM_KEY) || '{}'),
@@ -227,97 +196,70 @@ function hideLoading(){ document.getElementById('loadingOverlay').style.display=
 
 // === Charger CSV ===
 async function loadCSV(){
-  const fileId=new URLSearchParams(window.location.search).get('fileId');
-  const fileName=new URLSearchParams(window.location.search).get('fileName');
-  const fileNameDiv=document.getElementById('fileName');
-  const lineCountDiv=document.getElementById('lineCount');
-  const container=document.getElementById('tableContainer');
-  if(!fileId) return;
+  const fileId = new URLSearchParams(window.location.search).get('fileId');
+  const fileName = new URLSearchParams(window.location.search).get('fileName');
+  const fileNameDiv = document.getElementById('fileName');
+  const lineCountDiv = document.getElementById('lineCount');
+  const container = document.getElementById('tableContainer');
+  if (!fileId) return;
 
-  // 🔥 transformer les flammes en <span> animé (fichier)
-const flameTitle = (fileName||'').replace(
-  /🔥/g,
-  '<span class="flame" title="Brûleur(s) actuellement en fonctionnement">🔥</span>'
-);
-fileNameDiv.innerHTML = flameTitle;
+  fileNameDiv.textContent = fileName || '';
+  fileNameDiv.style.display = 'block';
+  lineCountDiv.style.display = 'block';
 
+  // ✅ Utilisation du proxy Netlify sécurisé
+  const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${fileId}&name=${encodeURIComponent(fileName || "")}`;
 
-  fileNameDiv.style.display='block'; 
-  lineCountDiv.style.display='block';
-
-  // 💡 afficher dossier courant + parent racine (si dispo) sans appel API
-  try {
-    const list = JSON.parse(localStorage.getItem("csvFilesList") || "[]");
-    const f = list.find(x => x.id === fileId);
-
-    if (f) {
-      let title = "";
-
-      if (f.parents && f.parents.length) {
-        const parent = list.find(x => x.id === f.parents[0]);
-        if (parent && parent.name) {
-          title = parent.name;
-
-          if (parent.parents && parent.parents.length) {
-            const root = list.find(x => x.id === parent.parents[0]);
-            if (root && root.name) {
-              title = root.name + " / " + parent.name;
-            }
-          }
-        }
-      }
-
-      if (!title) title = fileName;
-
-      // 🔥 transformer flamme en span animé
-const flameFolder = title.replace(
-  /🔥/g,
-  '<span class="flame" title="Brûleur(s) actuellement en fonctionnement">🔥</span>'
-);
-document.getElementById("currentFolderName").innerHTML = flameFolder;
-
-    }
-  } catch(e) {
-    console.warn("Impossible de récupérer le titre dossier", e);
-  }
-
-
-
-
-  const url=`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
   showLoading();
   try {
-    const response=await fetch(url);
-    if(!response.ok) throw new Error("HTTP " + response.status);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("HTTP " + response.status);
 
-    const blob=await response.blob();
-    const arrayBuffer=await blob.arrayBuffer();
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
     let text;
-    try{ text=new TextDecoder('windows-1252').decode(arrayBuffer); }
-    catch{ text=new TextDecoder('utf-8').decode(arrayBuffer); }
+    try { 
+      text = new TextDecoder('windows-1252').decode(arrayBuffer); 
+    } catch { 
+      text = new TextDecoder('utf-8').decode(arrayBuffer); 
+    }
 
-    const results=Papa.parse(text,{header:false,skipEmptyLines:true});
-    currentData=results.data;
-    const rowCount=currentData.length>1?currentData.length-1:0;
-    lineCountDiv.textContent=rowCount+" ligne"+(rowCount!==1?"s":"");
+    const results = Papa.parse(text, { header: false, skipEmptyLines: true });
+    currentData = results.data;
+    const rowCount = currentData.length > 1 ? currentData.length - 1 : 0;
+    lineCountDiv.textContent = rowCount + " ligne" + (rowCount !== 1 ? "s" : "");
     renderTable(currentData);
-  } catch(err){
-    console.error("Erreur:",err);
-    container.innerHTML=`
+
+    // === Tri automatique sur la colonne TIME (descendant) ===
+    const baseName = (fileName || "").split(/[\\/]/).pop();
+    const isZfile = baseName.startsWith("Z");
+    const headerRowIndex = isZfile ? 2 : 0;
+    const header = currentData[headerRowIndex].map(c => (c ?? "").toString().toUpperCase());
+
+    const timeColIndex = header.findIndex(h => h.includes("TIME"));
+    if (timeColIndex >= 0) {
+      sortAsc = false;
+      sortTable(timeColIndex);
+    }
+
+  } catch (err) {
+    console.error("Erreur:", err);
+    container.innerHTML = `
       <div style="padding:20px; background:#ffccbc; color:#d84315; border-radius:8px; font-weight:bold;">
         ⚠️ Impossible de charger le fichier CSV.<br>
-        Cause probable : restriction Google Drive (CORS) ou problème réseau.<br>
+        Restriction Google Drive: Réessayer plus tard<br>
         <button id="retryBtn" style="margin-top:10px; background:#e64a19; color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold;">
           🔄 Réessayer
         </button>
       </div>`;
-    const retry=document.getElementById("retryBtn");
-    if(retry){ retry.onclick=()=>{container.innerHTML="⏳ Nouvelle tentative...";loadCSV();}; }
+    const retry = document.getElementById("retryBtn");
+    if (retry) retry.onclick = () => { container.innerHTML = "⏳ Nouvelle tentative..."; loadCSV(); };
   } finally {
     hideLoading();
     updateNavButtons();
   }
 }
+
 
 // === Utils ===
 function escapeHtml(str){ return (str==null?'':String(str)).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
@@ -343,12 +285,16 @@ function renderTable(data){
   }
 
   html+='<tbody>';
-  for(let i=headerRowIndex+1;i<data.length;i++){
-    html+='<tr>';
-    data[i].forEach((cell,index)=> html+=`<td>${escapeHtml((cell??'').toString().trim())}</td>`);
-    html+='</tr>';
-  }
-  html+='</tbody></table>';
+html+='<tbody>';
+for(let i=data.length-1; i>headerRowIndex; i--){   // on part de la fin
+  html+='<tr>';
+  data[i].forEach((cell,index)=> {
+    html+=`<td>${escapeHtml((cell??'').toString().trim())}</td>`;
+  });
+  html+='</tr>';
+}
+html+='</tbody></table>';
+
   document.getElementById('tableContainer').innerHTML=html;
 
   // Panneau de toggles colonnes (reconstruit à chaque rendu)
@@ -728,6 +674,9 @@ window.onload=()=>{
 </script>
 </body>
 </html>
+
+
+
 
 
 
