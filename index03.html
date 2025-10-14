@@ -17,6 +17,10 @@
   --bg:#fff5f5; --panel:#ffffff; --accent:#ff7043; --accent-darker:#e64a19;
   --accent-muted:#ffccbc; --danger:#d84315; --text:#333;
 
+--text-light: #fff;
+--text-dark: #222;
+
+  
   /* Grille logique */
   --cols: 22;
   --rows-top: 6;
@@ -139,115 +143,139 @@ body{
 #gridWrap::-webkit-scrollbar-thumb{background:var(--accent);border-radius:10px;}
 #gridWrap::-webkit-scrollbar-track{background:#eee;}
 
-/* ====== RIGHT PANEL (Z3 EVENTS) — version fixe ====== */
-#sideCol{
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 28%;
-  height: 100%;
-  background: #fafafa;
-  border-left: 2px solid #ddd;
-  box-shadow: -4px 0 10px rgba(0,0,0,0.05);
+/* ===== Événements Z3 (volet élargi + scrollbar + nuance centrée) ===== */
+#sideCol {
+  flex: 0 1 auto;             /* largeur s’adapte au contenu */
+  min-width: 360px;
+  max-width: 600px;           /* largeur max pour les longs textes */
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  z-index: 1000;
+  background: var(--panel);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  max-height: calc(100vh - 160px);
+  overflow: hidden;
+  align-self: flex-start;
+  margin-bottom: 10px;
 }
 
-/* Titre */
+
 #sideHeader {
-  flex-shrink: 0;
-  background: #ffccbc;
-  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 10px;
+  background: var(--accent);
+  color: #fff;
   text-align: center;
-  font-weight: bold;
-  font-size: 18px;
-  color: #e64a19;
-  border-bottom: 1px solid #eee;
+  border-bottom: 2px solid var(--accent-darker);
 }
 
-/* Liste */
 #z3List {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px;
+  overflow-y: auto; /* ✅ scroll si trop d’événements */
+  background: var(--panel);
+  padding: 8px 10px;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
+/* Items */
 .z3Item {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
   border-radius: 6px;
-  margin: 6px 0;
-  padding: 8px 10px;
-  transition: background 0.3s, color 0.3s;
-  cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s, transform 0.15s;
 }
-
-.z3Item .t { font-family: monospace; font-size: 12px; color: #555; }
-.z3Item .d { font-size: 13px; color: #222; }
-
-/* Intensité progressive selon la proximité (gérée par JS) */
-.event-fade-0 { background-color: rgba(255,120,120,0.15); }
-.event-fade-1 { background-color: rgba(255,120,120,0.25); }
-.event-fade-2 { background-color: rgba(255,120,120,0.35); }
-.event-fade-3 { background-color: rgba(255,120,120,0.45); }
-.event-fade-4 { background-color: rgba(255,120,120,0.55); }
-.event-fade-5 { background-color: rgba(255,120,120,0.65); }
-.event-fade-6 { background-color: rgba(255,80,80,0.8); color: #fff; }
-
-.z3Item:hover {
-  background: #ffb3a1;
-  color: #700;
+.z3Item .t {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent-darker);
+  min-width: 52px;
+}
+.z3Item .d {
+  flex: 1;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 
-/* header + toggle */
-#sideHeader{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:10px 12px; border-bottom:1px solid #eee; background:var(--accent-muted);
-}
-#sideHeader h3{
-  font-size:14px; color:var(--accent-darker); margin:0; display:flex; align-items:center; gap:8px;
-}
-#toggleSide{
-  border:none; background:var(--accent); color:#fff; font-weight:bold;
-  padding:6px 10px; border-radius:6px; cursor:pointer;
-}
-#toggleSide:hover{ background:var(--accent-darker); }
 
-/* inner sections (volets coulissants) */
-.sideSection{ border-bottom:1px solid #f0f0f0; }
-.sideSection summary{
-  list-style:none; cursor:pointer; padding:10px 12px; font-weight:bold; color:var(--text);
-  background:#fafafa; border-top:1px solid #f3f3f3;
-}
-.sideSection summary::-webkit-details-marker{display:none;}
-.sideSection .sectionBody{ padding:8px 10px; }
-
-/* Z3 list */
-#z3List{
-  display:block;
-  overflow-y:auto;
-  border-radius:8px;
-  border:1px solid #eee;
-  background:#fff;
-  max-height:calc(100vh - 90px); /* remplit toute la hauteur visible */
+/* Dégradé centré sur l’événement (0 → 4) + texte adaptatif */
+.z3Item[data-intensity="0"],
+.hour-mark[data-intensity="0"] {
+  background-color: color-mix(in srgb, var(--accent) 5%, var(--panel));
+  color: var(--text-dark);
 }
 
-.z3Item{
-  display:flex; align-items:center; gap:8px;
-  padding:6px 8px; border-bottom:1px solid #f6f6f6; cursor:pointer;
+.z3Item[data-intensity="1"],
+.hour-mark[data-intensity="1"],
+.z3Item[data-intensity="2"],
+.hour-mark[data-intensity="2"],
+.z3Item[data-intensity="3"],
+.hour-mark[data-intensity="3"],
+.z3Item[data-intensity="4"],
+.hour-mark[data-intensity="4"] {
+  /* dès qu’il y a de la couleur, texte blanc */
+  color: var(--text-light);
 }
-.z3Item:hover{ background:var(--accent-muted); }
-.z3Item .t{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; color:#555; min-width:56px; }
-.z3Item .d{ flex:1; font-size:13px; color:#222; }
-.z3Item.active{
-  background: #ffe6cf; /* proche du thème orange */
+
+.z3Item[data-intensity="1"],
+.hour-mark[data-intensity="1"] {
+  background-color: color-mix(in srgb, var(--accent) 25%, var(--panel));
+}
+
+.z3Item[data-intensity="2"],
+.hour-mark[data-intensity="2"] {
+  background-color: color-mix(in srgb, var(--accent) 45%, var(--panel));
+}
+
+.z3Item[data-intensity="3"],
+.hour-mark[data-intensity="3"] {
+  background-color: color-mix(in srgb, var(--accent) 65%, var(--panel));
+}
+
+.z3Item[data-intensity="4"],
+.hour-mark[data-intensity="4"] {
+  background-color: var(--accent-darker);
+  transform: scale(1.02);
+}
+
+
+
+/* Lissage des transitions de couleur et lisibilité */
+.z3Item {
+  transition: background-color 0.4s ease, color 0.3s ease, transform 0.15s ease;
+}
+
+/* Lignes horaires (repères visuels) */
+.hour-mark {
+  opacity: 0.6;
+  font-style: italic;
+  background: var(--panel);
+  color: var(--accent-darker);
+  cursor: default;
+}
+
+
+/* Événement sélectionné */
+.z3Item.active {
   outline: 2px solid var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent-darker);
 }
+
+/* Scrollbar esthétique */
+#z3List::-webkit-scrollbar { width: 8px; }
+#z3List::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 6px; }
+#z3List::-webkit-scrollbar-track { background: var(--accent-muted); }
+
+
 
 /* collapsed state (rail) */
 #sideCol.collapsed{
@@ -265,6 +293,29 @@ body{
   padding:6px 8px; cursor:pointer; display:none;
 }
 #floatOpen:hover{ background: var(--accent-darker); }
+
+/* 🔧 Correctif final : texte blanc dès qu’une intensité colore la case */
+.z3Item[data-intensity]:not([data-intensity="0"]),
+.hour-mark[data-intensity]:not([data-intensity="0"]) {
+  color: var(--text-light) !important;
+}
+
+.z3Item[data-intensity]:not([data-intensity="0"]) .t,
+.z3Item[data-intensity]:not([data-intensity="0"]) .d,
+.hour-mark[data-intensity]:not([data-intensity="0"]) .t,
+.hour-mark[data-intensity]:not([data-intensity="0"]) .d {
+  color: var(--text-light) !important;
+}
+
+/* Et un petit contraste pour le texte neutre (intensité 0) */
+.z3Item[data-intensity="0"] .t,
+.z3Item[data-intensity="0"] .d,
+.hour-mark[data-intensity="0"] .t,
+.hour-mark[data-intensity="0"] .d {
+  color: var(--text-dark) !important;
+}
+
+  
 </style>
 </head>
 <body>
@@ -319,12 +370,9 @@ body{
 
 <script src="libs/papaparse.min.js"></script>
 <script>
-/* =================== Thème =================== */
-function applyThemeVars(vars){const r=document.documentElement;Object.entries(vars).forEach(([k,v])=>r.style.setProperty(k,v));}
-function setTheme(theme){
-  localStorage.setItem("selectedTheme",theme);
-  if(theme==="orange") applyThemeVars({"--accent":"#ff7043","--accent-darker":"#e64a19","--accent-muted":"#ffccbc","--bg":"#fff5f5","--panel":"#ffffff","--danger":"#d84315","--text":"#333"});
-}
+
+
+
 
 /* =================== Globals =================== */
 let csvData=[], headers=[], planTop=[], planBottom=[];
@@ -582,9 +630,73 @@ async function loadZ3ForSameDay() {
     }
   }
 
-  console.log("✅ Total événements Z3 chargés :", z3Events.length);
-  renderZ3List();
-  highlightZ3Near(currentRowMinutes(0));
+console.log("✅ Total événements Z3 chargés :", z3Events.length);
+
+// ✅ Aligne l'ordre logique : DOM des événements <-> z3Events
+z3Events.sort((a, b) => a.minutes - b.minutes);
+
+renderZ3List();
+highlightZ3Near(currentRowMinutes(0));
+
+}
+function updateZ3Intensity(currentMinutes) {
+  const RANGE = 15;          // influence ±15 min autour
+  const MAX_INTENSITY = 4;   // 0→4 correspond aux niveaux CSS
+
+  const allItems = Array.from(document.querySelectorAll("#z3List .z3Item, #z3List .hour-mark"));
+  if (!allItems.length) return;
+
+  allItems.forEach(el => {
+    let minutes;
+    if (el.classList.contains("hour-mark")) {
+      minutes = toMinutes(el.querySelector(".t")?.textContent);
+    } else {
+      const idx = parseInt(el.dataset.evIndex || "-1");
+      minutes = z3Events[idx]?.minutes ?? NaN;
+    }
+
+    if (isNaN(minutes)) {
+      el.dataset.intensity = 0;
+      return;
+    }
+
+    const diff = Math.abs(minutes - currentMinutes);
+    const ratio = 1 - Math.min(diff / RANGE, 1);
+    const level = Math.round(ratio * MAX_INTENSITY);
+    el.dataset.intensity = level;
+  });
+  allItems.forEach(el => {
+    let minutes;
+    if (el.classList.contains("hour-mark")) {
+      minutes = toMinutes(el.querySelector(".t")?.textContent);
+    } else {
+      const idx = parseInt(el.dataset.evIndex || "-1");
+      minutes = z3Events[idx]?.minutes ?? NaN;
+    }
+
+    if (isNaN(minutes)) {
+      el.dataset.intensity = 0;
+      return;
+    }
+
+    const diff = Math.abs(minutes - currentMinutes);
+    const ratio = 1 - Math.min(diff / RANGE, 1);
+    const level = Math.round(ratio * MAX_INTENSITY);
+    el.dataset.intensity = level;
+  });
+
+  // 🔹 Lisibilité dynamique : texte clair sur fond sombre
+  allItems.forEach(el => {
+    const style = getComputedStyle(el);
+    const bg = style.backgroundColor;
+
+    // Convertit la couleur en luminance relative (perceptuelle)
+    const rgb = bg.match(/\d+/g)?.map(Number) || [255,255,255];
+    const luminance = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+
+    // Détermine couleur texte : clair si fond sombre
+    el.style.color = luminance < 0.5 ? "var(--text-light)" : "var(--text-dark)";
+  });
 }
 
 
@@ -592,66 +704,104 @@ async function loadZ3ForSameDay() {
 
 
 
-function renderZ3List(){
+
+
+
+
+
+
+// 🔁 Version alignée : z3Events trié + repères 15 min intercalés
+function renderZ3List() {
   const box = document.getElementById("z3List");
   box.innerHTML = "";
-  if(!z3Events.length){
+
+  if (!z3Events.length) {
     box.innerHTML = `<div class="z3Item" style="opacity:.7;cursor:default;">
-      <span class="t">--:--</span><span class="d">Aucun evenement Z3</span>
+      <span class="t">--:--</span><span class="d">Aucun événement Z3</span>
     </div>`;
     return;
   }
 
-  const now = Date.now();
-
-  for (const ev of z3Events) {
-    const div = document.createElement("div");
-    const evTime = new Date(); // on part de la date du jour
-    const [hh, mm] = ev.timeText.split(":").map(v=>parseInt(v)||0);
-    evTime.setHours(hh, mm, 0, 0);
-    const diffMin = Math.abs((evTime - now) / 60000);
-
-    let intensity = 0;
-    if (diffMin < 2) intensity = 6;
-    else if (diffMin < 5) intensity = 5;
-    else if (diffMin < 10) intensity = 4;
-    else if (diffMin < 20) intensity = 3;
-    else if (diffMin < 40) intensity = 2;
-    else if (diffMin < 80) intensity = 1;
-
-    div.className = `z3Item event-fade-${intensity}`;
-    div.innerHTML = `<span class="t">${ev.timeText || "--:--"}</span><span class="d">${ev.desc || ""}</span>`;
-    div.onclick = ()=> jumpSliderToClosest(ev.minutes);
-    box.appendChild(div);
-  }
-}
-
-
-function highlightZ3Near(targetMinutes){
-  const list = document.querySelectorAll("#z3List .z3Item");
-  list.forEach(el => el.classList.remove("active"));
-  if(isNaN(targetMinutes)) return;
-
-  let best = null, bestDiff = Infinity;
-  z3Events.forEach((ev, idx) => {
-    const diff = Math.abs(ev.minutes - targetMinutes);
-    if(diff < bestDiff){ bestDiff = diff; best = { idx, ev }; }
-  });
-  if(best && bestDiff <= Z3_HILITE_TOL_MIN){
-    const items = document.querySelectorAll("#z3List .z3Item");
-    const el = items[best.idx];
-    if(el){
-      el.classList.add("active");
-      // scroll dans la vue si besoin
-      const box = document.getElementById("z3List");
-      const boxRect = box.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      if(elRect.top < boxRect.top || elRect.bottom > boxRect.bottom){
-        box.scrollTop = el.offsetTop - box.clientHeight/2 + el.clientHeight/2;
-      }
+  // Repères horaires 00:00 → 23:45 (toutes les 15 min)
+  const timeMarks = [];
+  for (let h = 0; h < 24; h++) {
+    for (let q = 0; q < 60; q += 15) {
+      const hh = String(h).padStart(2, "0");
+      const mm = String(q).padStart(2, "0");
+      timeMarks.push(`${hh}:${mm}`);
     }
   }
+
+  // z3Events est DÉJÀ TRIÉ par minutes
+  let evIdx = 0;
+
+  for (const mark of timeMarks) {
+    const markMin = toMinutes(mark);
+
+    // Ligne de repère
+    const markDiv = document.createElement("div");
+    markDiv.className = "z3Item hour-mark";
+    markDiv.innerHTML = `<span class="t">${mark}</span><span class="d"></span>`;
+    box.appendChild(markDiv);
+
+    // Ajoute tous les événements qui tombent dans ce quart d'heure
+    while (evIdx < z3Events.length && z3Events[evIdx].minutes < markMin + 15) {
+      const ev = z3Events[evIdx];
+      const div = document.createElement("div");
+      div.className = "z3Item";
+      // stocke l’index logique de l’événement (optionnel mais utile)
+      div.dataset.evIndex = String(evIdx);
+      div.innerHTML = `<span class="t">${ev.timeText}</span><span class="d">${ev.desc}</span>`;
+      div.onclick = () => jumpSliderToClosest(ev.minutes);
+      box.appendChild(div);
+      evIdx++;
+    }
+
+    if (evIdx >= z3Events.length) break; // plus d'événements : on peut s’arrêter tôt
+  }
 }
+
+
+
+
+function highlightZ3Near(targetMinutes) {
+  // Nettoie tout
+  document.querySelectorAll("#z3List .z3Item").forEach(el => el.classList.remove("active"));
+  if (isNaN(targetMinutes) || !z3Events.length) return;
+
+  // Trouve l’index de l’événement le plus proche
+  let bestIdx = -1, bestDiff = Infinity;
+  z3Events.forEach((ev, idx) => {
+    const diff = Math.abs(ev.minutes - targetMinutes);
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = idx; }
+  });
+
+  // Tolérance
+  if (bestIdx === -1 || bestDiff > Z3_HILITE_TOL_MIN) return;
+
+  // Récupère la N-ième tuile événement (en ignorant les repères)
+  const eventItems = Array.from(document.querySelectorAll("#z3List .z3Item"))
+    .filter(el => !el.classList.contains("hour-mark"));
+
+  const el = eventItems[bestIdx];
+  if (el) {
+    el.classList.add("active");
+
+    // Scroll dans la vue si besoin
+    const box = document.getElementById("z3List");
+    const boxRect = box.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.top < boxRect.top || elRect.bottom > boxRect.bottom) {
+      box.scrollTop = el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2;
+    }
+  }
+} // ✅ cette accolade ferme bien la fonction entière
+
+
+
+
+
+
 
 function jumpSliderToClosest(targetMinutes){
   if(!csvData.length) return;
@@ -738,16 +888,17 @@ function updateTileSize(){
 /* =================== CSV (Drive ou LocalStorage) =================== */
 // === Helper encodage intelligent ===
 function decodeSmart(arrayBuffer) {
-  // 1️⃣ tentative UTF-8
   let txt = new TextDecoder("utf-8", { fatal: false }).decode(arrayBuffer);
-  // 2️⃣ détection de mojibake ("Ã", "Â", "�") → on retente ISO-8859-1
   if (txt.includes("Ã") || txt.includes("Â") || txt.includes("�")) {
     try {
       txt = new TextDecoder("iso-8859-1").decode(arrayBuffer);
-    } catch {}
+    } catch (e) {
+      console.warn("Erreur de décodage ISO-8859-1", e);
+    }
   }
   return txt;
 }
+
 
   
   async function loadCSV(){
@@ -979,6 +1130,8 @@ function updateGrid(idx){
 
   // ➕ Surligne l'event Z3 le plus proche de l'heure courante
   const mins = minutesFromRowTime(row);
+  updateZ3Intensity(mins);
+
   highlightZ3Near(mins);
 }
 
@@ -1002,27 +1155,111 @@ document.getElementById("maxInput").addEventListener("change", ()=>{
 
 
 /* =================== INIT =================== */
+
+  /* ----------- Thèmes + persistance ----------- */
+function setTheme(theme){
+  const r=document.documentElement;
+  localStorage.setItem("selectedTheme",theme);
+
+  if(theme==="orange"){
+    r.style.setProperty("--accent","#ff7043");
+    r.style.setProperty("--accent-darker","#e64a19");
+    r.style.setProperty("--accent-muted","#ffccbc");
+    r.style.setProperty("--bg","#fff5f5");
+    r.style.setProperty("--panel","#ffffff");
+    r.style.setProperty("--sidebar-bg","#ffe5d9");
+    r.style.setProperty("--danger","#d84315");
+    r.style.setProperty("--text","#333");
+    r.style.setProperty("--row-even","#ffe5d9");
+    r.style.setProperty("--row-odd","#fff5f5");
+    r.style.setProperty("--text-light", "#fff");
+r.style.setProperty("--text-dark", "#222");
+
+  }
+  if(theme==="blue"){
+    r.style.setProperty("--accent","#2196f3");
+    r.style.setProperty("--accent-darker","#1976d2");
+    r.style.setProperty("--accent-muted","#bbdefb");
+    r.style.setProperty("--bg","#e3f2fd");
+    r.style.setProperty("--panel","#ffffff");
+    r.style.setProperty("--sidebar-bg","#bbdefb");
+    r.style.setProperty("--danger","#0d47a1");
+    r.style.setProperty("--text","#0d47a1");
+    r.style.setProperty("--row-even","#bbdefb");
+    r.style.setProperty("--row-odd","#e3f2fd");
+    r.style.setProperty("--text-light", "#fff");
+r.style.setProperty("--text-dark", "#222");
+
+  }
+  if(theme==="green"){
+    r.style.setProperty("--accent","#4caf50");
+    r.style.setProperty("--accent-darker","#2e7d32");
+    r.style.setProperty("--accent-muted","#c8e6c9");
+    r.style.setProperty("--bg","#f1f8e9");
+    r.style.setProperty("--panel","#ffffff");
+    r.style.setProperty("--sidebar-bg","#c8e6c9");
+    r.style.setProperty("--danger","#1b5e20");
+    r.style.setProperty("--text","#1b5e20");
+    r.style.setProperty("--row-even","#c8e6c9");
+    r.style.setProperty("--row-odd","#f1f8e9");
+    r.style.setProperty("--text-light", "#fff");
+r.style.setProperty("--text-dark", "#222");
+
+  }
+  if(theme==="purple"){
+    r.style.setProperty("--accent","#9c27b0");
+    r.style.setProperty("--accent-darker","#6a1b9a");
+    r.style.setProperty("--accent-muted","#e1bee7");
+    r.style.setProperty("--bg","#f3e5f5");
+    r.style.setProperty("--panel","#ffffff");
+    r.style.setProperty("--sidebar-bg","#e1bee7");
+    r.style.setProperty("--danger","#4a148c");
+    r.style.setProperty("--text","#4a148c");
+    r.style.setProperty("--row-even","#e1bee7");
+    r.style.setProperty("--row-odd","#f3e5f5");
+    r.style.setProperty("--text-light", "#fff");
+r.style.setProperty("--text-dark", "#222");
+
+  }
+  if(theme==="bordeaux"){
+    r.style.setProperty("--accent","#800020");
+    r.style.setProperty("--accent-darker","#4b0014");
+    r.style.setProperty("--accent-muted","#d7a1a9");
+    r.style.setProperty("--bg","#fff0f2");
+    r.style.setProperty("--panel","#ffffff");
+    r.style.setProperty("--sidebar-bg","#f3cdd3");
+    r.style.setProperty("--danger","#600018");
+    r.style.setProperty("--text","#4b0014");
+    r.style.setProperty("--row-even","#f3cdd3");
+    r.style.setProperty("--row-odd","#fff0f2");
+    r.style.setProperty("--text-light", "#fff");
+r.style.setProperty("--text-dark", "#222");
+
+  }
+
+  r.style.setProperty("--text-light", "#fff");
+  r.style.setProperty("--text-dark", "#222");
+
+}
+
+  const savedTheme = localStorage.getItem("selectedTheme") || "orange";
+setTheme(savedTheme);
+
+
+  
 document.addEventListener("DOMContentLoaded", async () => {
-  setTheme(localStorage.getItem("selectedTheme") || "orange");
-  await ensureZ3FilesLoaded(); // 🧩 s'assure que les Z3 sont disponibles
+  await ensureZ3FilesLoaded();
   loadPlan();
   requestAnimationFrame(updateTileSize);
   loadCSV();
   window.addEventListener("load", updateTileSize);
 });
 
+
+
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
 
 
 
