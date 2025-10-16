@@ -70,7 +70,17 @@ body{
 #folderTree li{cursor:pointer;margin:5px 0;}
 .folder-toggle{font-weight:bold;margin-right:5px;cursor:pointer;color:var(--accent);}
 .folder-name{cursor:pointer;}
-.active-folder{background:var(--accent-muted);border-radius:3px;padding:2px 4px;}
+.active-folder {
+  background: var(--accent-muted);
+  border-left: 2px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-weight: 600;
+  color: var(--accent-darker);
+  box-shadow: none;
+}
+
+
 
 /* Main */
 #main{flex:1;padding:10px 20px;display:flex;flex-direction:column;overflow:hidden;}
@@ -259,15 +269,16 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
   <div id="tableWrapper">
     <div id="tableContainer">
       <table id="csvTable">
-        <thead>
-          <tr>
-            <th onclick="sortTable(0,'date')">Date <span class="sort-arrow"></span></th>
-            <th>Nom du fichier</th>
-            <th>Dossier</th>
-            <th onclick="sortTable(3,'number')">Taille <span class="sort-arrow"></span></th>
-            <th>Télécharger / Ouvrir</th>
-          </tr>
-        </thead>
+       <thead>
+  <tr>
+    <th onclick="sortTable(0,'date')">Date <span class="sort-arrow"></span></th>
+    <th>Télécharger / Ouvrir</th>
+    <th>Nom du fichier</th>
+    <th>Dossier</th>
+    <th onclick="sortTable(4,'number')">Taille <span class="sort-arrow"></span></th>
+  </tr>
+</thead>
+
         <tbody>
           <tr>
             <td colspan="5" style="text-align:left;">
@@ -400,6 +411,7 @@ async function fetchFolderContents(folderId){
 
 
 
+
 async function loadRootFolders(){
   const files = await fetchFolderContents(ROOT_FOLDER_ID);
   const rootUL = document.getElementById('folderTree');
@@ -414,10 +426,25 @@ async function loadRootFolders(){
     toggle.textContent = '+';
     toggle.onclick = () => toggleFolder(li);
 
-    const span = document.createElement('span'); 
-    span.className = 'folder-name'; 
-    span.textContent = f.name;
-    span.onclick = () => loadFolderFilesOnClick(li);
+const span = document.createElement('span');
+span.className = 'folder-name';
+
+const lowerName = f.name.toLowerCase();
+if (lowerName.includes("traça_temp") || lowerName.includes("traca_temp")) {
+  span.innerHTML = `📈 ${f.name}`;
+} else if (lowerName.includes("echantillonnage")) {
+  span.innerHTML = `📊 ${f.name}`;
+} else if (lowerName.includes("historique")) {
+  span.innerHTML = `🗂️ ${f.name}`;
+} else {
+  span.textContent = f.name; // pas d’icône
+}
+
+
+span.onclick = () => loadFolderFilesOnClick(li);
+
+
+
 
     li.appendChild(toggle); 
     li.appendChild(span); 
@@ -458,10 +485,22 @@ async function toggleFolder(li){
     childToggle.textContent='+';
     childToggle.onclick=()=>toggleFolder(childLi);
 
-    const span=document.createElement('span'); 
-    span.className='folder-name'; 
-    span.textContent=f.name;
-    span.onclick=()=>loadFolderFilesOnClick(childLi);
+const span = document.createElement('span');
+span.className = 'folder-name';
+
+const lowerName = f.name.toLowerCase();
+if (lowerName.includes("traça_temp") || lowerName.includes("traca_temp")) {
+  span.innerHTML = `📈 ${f.name}`;
+} else if (lowerName.includes("echantillonnage")) {
+  span.innerHTML = `📊 ${f.name}`;
+} else if (lowerName.includes("historique")) {
+  span.innerHTML = `🗂️ ${f.name}`;
+} else {
+  span.textContent = f.name;
+}
+
+span.onclick = () => loadFolderFilesOnClick(childLi);
+
 
     childLi.appendChild(childToggle); 
     childLi.appendChild(span); 
@@ -499,12 +538,21 @@ async function fetchChildren(folderId){
 async function loadFolderFilesOnClick(li){
   await toggleFolder(li);
 
-  // Réinitialiser la sélection visuelle
-  document.querySelectorAll('#folderTree li span.folder-name').forEach(s=>s.classList.remove('active-folder'));
-  const nameSpan = li.querySelector('span.folder-name');
-  if(nameSpan){ 
-    nameSpan.classList.add('active-folder'); 
-  }
+// 🔄 Réinitialiser la sélection visuelle
+document.querySelectorAll('#folderTree li span.folder-name').forEach(s => s.classList.remove('active-folder'));
+
+// ✅ Surligne le dossier cliqué
+const nameSpan = li.querySelector('span.folder-name');
+if (nameSpan) nameSpan.classList.add('active-folder');
+
+// ✅ Surligne aussi tous les parents (chemin hiérarchique)
+let parentLi = li.parentElement.closest('li');
+while (parentLi) {
+  const parentSpan = parentLi.querySelector('span.folder-name');
+  if (parentSpan) parentSpan.classList.add('active-folder');
+  parentLi = parentLi.parentElement.closest('li');
+}
+
   localStorage.setItem('lastFolderId', li.dataset.id);
 
   const folderName = nameSpan ? nameSpan.textContent.toLowerCase() : "";
@@ -705,7 +753,12 @@ if(f.name.toLowerCase().endsWith('.csv')){
     }
     tdAction.innerHTML=html;
 
-    tr.appendChild(tdDate); tr.appendChild(tdName); tr.appendChild(tdFolder); tr.appendChild(tdSize); tr.appendChild(tdAction);
+  tr.appendChild(tdDate);
+tr.appendChild(tdAction);
+tr.appendChild(tdName);
+tr.appendChild(tdFolder);
+tr.appendChild(tdSize);
+
     tbody.appendChild(tr);
   }
 }
@@ -1096,3 +1149,10 @@ window.onload=()=>{
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
