@@ -485,27 +485,45 @@ document.getElementById("currentFolderName").innerHTML = flameTitle;
 
   let defX = headers.find(h=>h.toLowerCase().includes("time")||h.toLowerCase()==="heure");
 
-  headers.forEach((f,i)=>{
-    // X : on ajoute toutes les colonnes
-    const ox = document.createElement("option");
-    ox.value = f; ox.text = f;
-    xSel.appendChild(ox);
+headers.forEach((f,i)=>{
+  // X : on ajoute toutes les colonnes
+  const ox = document.createElement("option");
+  ox.value = f;
+  ox.text = f;
+  xSel.appendChild(ox);
 
-    // Y : on saute la colonne temps
-    if(f===defX || /time|date|jour/.test(f.toLowerCase())) return;
+  // Y : on saute la colonne temps
+  if (f === defX || /time|date|jour/.test(f.toLowerCase())) return;
 
-    const label = document.createElement("label");
-    label.innerHTML = `<input type="checkbox" value="${f}"> ${f}`;
-    yContainer.appendChild(label);
-  });
+  // 🔹 coche automatiquement SONDE AC INF / SUP
+  const checkedByDefault =
+    f.toUpperCase().includes("SONDE AC INF") ||
+    f.toUpperCase().includes("SONDE AC SUP");
 
-  document.getElementById('columnSelectors').style.display = "flex";
+  const label = document.createElement("label");
+  label.innerHTML = `<input type="checkbox" value="${f}" ${checkedByDefault ? "checked" : ""}> ${f}`;
+  yContainer.appendChild(label);
+});
 
-  if(defX){
-    xSel.value = defX;
-    xSel.style.display = "none";
-    timeField = defX;
+// === afficher les sélecteurs ===
+document.getElementById('columnSelectors').style.display = "flex";
+
+if (defX) {
+  xSel.value = defX;
+  xSel.style.display = "none";
+  timeField = defX;
+}
+
+// === après l’enrichissement, tracer automatiquement les bonnes colonnes ===
+setTimeout(() => {
+  currentX = defX;
+  currentY = Array.from(document.querySelectorAll("#yColumnsContainer input:checked")).map(cb => cb.value);
+
+  if (currentY.length && csvData.length && timeField) {
+    drawChart();
   }
+}, 300);
+
 
   saMeta = parseSAFileName(baseFileName);
   if(saMeta){
@@ -1299,5 +1317,3 @@ async function autoLoadDays(chart){
   </script>
 </body>
 </html>
-
-
