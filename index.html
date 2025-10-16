@@ -204,16 +204,24 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
 }
 #themeMenu button:hover {background: var(--accent-darker);}
 .flame {
-  display:inline-block;
-  animation:flicker 0.6s infinite alternate;
+  display: flex;                /* permet de centrer facilement */
+  justify-content: center;      /* horizontalement */
+  align-items: center;          /* verticalement */
+  font-size: 22px;              /* taille de la flamme */
+  line-height: 1;
+  animation: flicker 0.6s infinite alternate,
+             sway 1.2s infinite ease-in-out; /* mouvement latéral doux */
+  text-shadow:
+    0 0 4px rgba(255, 140, 0, 0.8),
+    0 0 8px rgba(255, 80, 0, 0.7),
+    0 0 12px rgba(255, 30, 0, 0.5);
 }
 
-@keyframes flicker {
-  0%   { transform: translateY(0) scale(1); color: #ff7043; }
-  30%  { transform: translateY(-1px) scale(1.05); color: #ff5722; }
-  60%  { transform: translateY(-2px) scale(1.1); color: #ff9800; }
-  100% { transform: translateY(0) scale(1); color: #ff7043; }
+@keyframes sway {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px) rotate(3deg); }
 }
+
 
 #eventAlert {
   display:none;
@@ -269,15 +277,18 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
   <div id="tableWrapper">
     <div id="tableContainer">
       <table id="csvTable">
-       <thead>
+<thead>
   <tr>
     <th onclick="sortTable(0,'date')">Date <span class="sort-arrow"></span></th>
+    <th style="width:40px; text-align:center;"></th>
+
     <th>Télécharger / Ouvrir</th>
     <th>Nom du fichier</th>
     <th>Dossier</th>
-    <th onclick="sortTable(4,'number')">Taille <span class="sort-arrow"></span></th>
+    <th onclick="sortTable(5,'number')">Taille <span class="sort-arrow"></span></th>
   </tr>
 </thead>
+
 
         <tbody>
           <tr>
@@ -417,7 +428,11 @@ async function loadRootFolders(){
   const rootUL = document.getElementById('folderTree');
   rootUL.innerHTML = '';
 
-  files.filter(f => f.mimeType === 'application/vnd.google-apps.folder').forEach(f => {
+  files
+  .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+  .sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity:'base' }))
+  .forEach(f => {
+
     const li = document.createElement('li'); 
     li.dataset.id = f.id;
 
@@ -476,7 +491,12 @@ async function toggleFolder(li){
   toggle.textContent='…';
   const files=await fetchFolderContents(li.dataset.id);
   const ul=document.createElement('ul');
-  for (const f of files.filter(f => f.mimeType === 'application/vnd.google-apps.folder')) {
+  const folders = files
+  .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+  .sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity:'base' }));
+
+for (const f of folders) {
+
     const childLi=document.createElement('li'); 
     childLi.dataset.id=f.id;
 
@@ -638,6 +658,12 @@ function displayFiles(files, folderName){
 
 const tr=document.createElement('tr');
 
+    const tdFlame = document.createElement('td');
+tdFlame.style.textAlign = "center";
+tdFlame.style.width = "26px";
+tdFlame.textContent = "";
+
+
 // Bloc DATE avec affichage du jour
 const tdDate=document.createElement('td');
 if (date) {
@@ -687,22 +713,34 @@ if (f.name.toLowerCase().endsWith(".csv") &&
       if (idxInf === undefined && idxSup === undefined) { tdName.innerHTML = f.name; return; }
 
       let countFlame = 0;
-      for (let i = 1; i < lines.length; i++) {
-        if (cancelScan) { tdName.innerHTML = f.name; return; } // 🛑 stop en plein scan
-        const cols = lines[i].split(",").map(c => c.replace(/"/g,"").trim());
-        const vInf = idxInf !== undefined ? parseFloat(cols[idxInf]) : NaN;
-        const vSup = idxSup !== undefined ? parseFloat(cols[idxSup]) : NaN;
-        if ((isFinite(vInf) && vInf > FLAME_THRESHOLD) ||
-            (isFinite(vSup) && vSup > FLAME_THRESHOLD)) {
-          countFlame++;
-        }
-      }
+for (let i = 1; i < lines.length; i++) {
+  const cols = lines[i].split(",").map(c => c.replace(/"/g,"").trim());
 
-      if (countFlame >= 1) {
-        tdName.innerHTML = `${f.name}&nbsp;&nbsp;&nbsp;<span class="flame" title="Brûleur actif détecté">🔥</span>`;
-      } else {
-        tdName.innerHTML = f.name;
-      }
+  // 🕔 Vérifie l’heure (colonne 0 supposée être l’heure du point)
+  const timeStr = cols[0];
+  if (timeStr && /^(\d{2}):(\d{2})/.test(timeStr)) {
+    const [_, hh, mm] = timeStr.match(/^(\d{2}):(\d{2})/);
+    const hour = parseInt(hh, 10);
+
+    // ⏰ Ignore les valeurs avant 5h ou après 23h59
+    if (hour < 5 || hour >= 24) continue;
+  }
+
+  const vInf = idxInf !== undefined ? parseFloat(cols[idxInf]) : NaN;
+  const vSup = idxSup !== undefined ? parseFloat(cols[idxSup]) : NaN;
+
+  if ((isFinite(vInf) && vInf > FLAME_THRESHOLD) ||
+      (isFinite(vSup) && vSup > FLAME_THRESHOLD)) {
+    countFlame++;
+  }
+}
+
+
+if (countFlame >= 1) {
+  tdFlame.innerHTML = `<span class="flame" title="Brûleur actif détecté ce jour !">🔥</span>`;
+}
+tdName.textContent = f.name;
+
     } catch(e) {
       console.error("Erreur flamme fichier:", f.name, e);
       tdName.innerHTML = f.name;
@@ -753,11 +791,14 @@ if(f.name.toLowerCase().endsWith('.csv')){
     }
     tdAction.innerHTML=html;
 
-  tr.appendChild(tdDate);
+
+tr.appendChild(tdDate);
+    tr.appendChild(tdFlame);
 tr.appendChild(tdAction);
 tr.appendChild(tdName);
 tr.appendChild(tdFolder);
 tr.appendChild(tdSize);
+
 
     tbody.appendChild(tr);
   }
@@ -1149,6 +1190,13 @@ window.onload=()=>{
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
 
 
 
