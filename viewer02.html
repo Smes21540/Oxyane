@@ -218,6 +218,95 @@
   100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
 }
 
+/* Bouton flottant */
+#noteButton {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  transition: transform 0.2s;
+  z-index: 1200;
+}
+#noteButton:hover {
+  transform: scale(1.1);
+  background: var(--accent-darker);
+}
+
+/* Popup de note */
+#notePopup {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+
+#notePopup.active {
+  display: flex;
+}
+
+.note-content {
+  background: var(--panel);
+  color: var(--text);
+  padding: 20px;
+  border-radius: 10px;
+  width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.note-content h3 {
+  margin-top: 0;
+  color: var(--accent);
+}
+
+#noteText {
+  width: 100%;
+  height: 120px;
+  border: 1px solid var(--table-border);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+  font-size: 14px;
+}
+
+.note-actions {
+  margin-top: 10px;
+  text-align: right;
+}
+
+.note-actions button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.note-actions button:hover {
+  background: var(--accent-darker);
+}
+
+#noteStatus {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted-text);
+}
 
 
   </style>
@@ -1305,7 +1394,106 @@ async function autoLoadDays(chart){
       document.querySelector(".graph-wrapper").after(dl);
     }
   })();
+
+
+
+    
   </script>
+
+<!-- 📝 Bouton flottant pour ajouter une note -->
+<div id="noteButton" title="Ajouter une note sur cette courbe">🗒️</div>
+
+<!-- Popup de saisie -->
+<div id="notePopup">
+  <div class="note-content">
+    <h3>Nouvelle note</h3>
+    <textarea id="noteText" placeholder="Écrire une remarque..."></textarea>
+    <div class="note-actions">
+      <button id="saveNoteBtn">Enregistrer</button>
+      <button id="cancelNoteBtn">Annuler</button>
+    </div>
+    <div id="noteStatus"></div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const noteBtn = document.getElementById("noteButton");
+  const notePopup = document.getElementById("notePopup");
+  const noteText = document.getElementById("noteText");
+  const saveNoteBtn = document.getElementById("saveNoteBtn");
+  const cancelNoteBtn = document.getElementById("cancelNoteBtn");
+  const noteStatus = document.getElementById("noteStatus");
+
+  if (!noteBtn) return; // sécurité
+
+  noteBtn.addEventListener("click", () => {
+    noteText.value = "";
+    noteStatus.textContent = "";
+    notePopup.classList.add("active");
+    noteText.focus();
+  });
+
+  cancelNoteBtn.addEventListener("click", () => {
+    notePopup.classList.remove("active");
+  });
+
+saveNoteBtn.addEventListener("click", async () => {
+  const content = noteText.value.trim();
+  if (!content) {
+    noteStatus.textContent = "⚠️ Note vide, rien à enregistrer.";
+    return;
+  }
+
+  noteStatus.textContent = "💾 Enregistrement en cours...";
+
+  try {
+    const res = await fetch("https://script.google.com/macros/s/AKfycbzgb4xlCMFokRwY4PZrEovYouAkQLDbFY6MmWRIVGDhbLtG54uXv5iohkH2KauF4hVH/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        csvName: baseFileName || "inconnu",
+        note: JSON.stringify({
+          message: content,
+          time: new Date().toISOString(),
+          viewer: window.location.href
+        })
+      })
+    });
+
+    const text = await res.text();
+    noteStatus.textContent = "✅ Note envoyée avec succès";
+    console.log("Réponse du serveur:", text);
+
+    setTimeout(() => {
+      notePopup.classList.remove("active");
+    }, 1000);
+
+  } catch (e) {
+    console.error("Erreur envoi note:", e);
+    noteStatus.textContent = "⚠️ Échec de l’envoi : " + e.message;
+  }
+});
+
+
+
+});
+</script>
+
+  
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
