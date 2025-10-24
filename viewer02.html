@@ -1447,14 +1447,16 @@ try {
       console.log("✅ Notes chargées :", notes);
 
       // 🔧 Conversion et nettoyage des données avant affichage
-      notesData = notes.map(n => ({
-        x: typeof n.x === "string" ? Number(n.x) || new Date(n.x).getTime() : n.x,
-        y: typeof n.y === "string" ? parseFloat(n.y) : n.y,
-        text: n.note,
-        author: n.author,
-        createdAt: n.createdAt,
-        status: n.status || "active"
-      }));
+notesData = notes.map(n => ({
+  id: n.id || crypto.randomUUID(),               // 🆔 on garde l'identifiant
+  x: typeof n.x === "string" ? Number(n.x) || new Date(n.x).getTime() : n.x,
+  y: typeof n.y === "string" ? parseFloat(n.y) : n.y,
+  text: n.note,
+  author: n.author,
+  createdAt: n.createdAt,
+  status: n.status || "active"
+}));
+
 
       // 🧹 On garde uniquement les notes valides
       notesData = notesData.filter(n => Number.isFinite(n.x) && Number.isFinite(n.y));
@@ -1627,15 +1629,18 @@ const response = await fetch(
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
 body: new URLSearchParams({
+  id: crypto.randomUUID(),                        // 🆔 identifiant unique
   csvName: baseFileName || "inconnu.csv",
   fileId: baseFileId,
-  folderId: localStorage.getItem("lastFolderId"),  // ✅ bon dossier !
+  folderId: localStorage.getItem("lastFolderId"),  // ✅ bon dossier conservé
   author: authorInput.value || "Anonyme",
   note: content,
   x: clickedPoint ? clickedPoint.x : "",
   y: clickedPoint ? clickedPoint.y : "",
-  createdAt: createdAt
+  createdAt: createdAt,
+  status: "active"                                // ✅ statut explicite
 })
+
 
       }
     );
@@ -1644,14 +1649,16 @@ body: new URLSearchParams({
     console.log("Réponse serveur:", textRes);
     status.textContent = "✅ Note enregistrée !";
 
-    notesData.push({
-      x: clickedPoint.x,
-      y: clickedPoint.y,
-      text: content,
-      author: authorInput.value || "Anonyme",
-      createdAt: createdAt,
-      status: "active",
-    });
+notesData.push({
+  id: crypto.randomUUID(),                       // 🆔 identifiant local
+  x: clickedPoint.x,
+  y: clickedPoint.y,
+  text: content,
+  author: authorInput.value || "Anonyme",
+  createdAt: createdAt,
+  status: "active",
+});
+
 
     if (chart) chart.update("none");
     setTimeout(() => popup.classList.remove("active"), 800);
@@ -1708,13 +1715,15 @@ showConfirm("Confirmer la suppression de cette note ?", async () => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
 body: new URLSearchParams({
-  folderId: currentFolderId,   // dossier Drive exact
+  id: note.id || "",                             // 🆔 identifiant pour mise à jour
+  folderId: localStorage.getItem("lastFolderId"), // ✅ on revient au bon dossier !
   csvName: baseFileName,
-  note: note.text || note.note, // ✅ ajoute le texte de la note !
+  note: note.text || note.note,
   x: note.x,
   y: note.y,
   status: "inactive"
 })
+
 
 
       }
@@ -1855,8 +1864,6 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
-
-
 
 
 
