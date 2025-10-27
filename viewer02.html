@@ -819,24 +819,56 @@ const notesPlugin = {
     const yScale = chart.scales.y;
 
     ctx.save();
-    ctx.font = "16px Segoe UI";
+    ctx.font = "20px Segoe UI Emoji";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = getCSSVar("--danger") || "red";
 
     notesData.forEach(n => {
       if (n.status !== "active") return;
- // 🔥 Masquer notes supprimées
       const x = xScale.getPixelForValue(n.x);
       const y = yScale.getPixelForValue(n.y);
       if (x < xScale.left || x > xScale.right) return;
       if (y < yScale.top || y > yScale.bottom) return;
-      ctx.fillText("🗒️", x, y);
+      ctx.fillText("🖊️", x, y);
     });
 
     ctx.restore();
+
+    // 🔥 Détection du survol pour changer le curseur
+    const canvas = chart.canvas;
+    canvas.style.cursor = "default";
+
+    if (!chart.$mousemoveHandlerAttached) {
+      chart.$mousemoveHandlerAttached = true;
+canvas.addEventListener("mousemove", (ev) => {
+  const rect = canvas.getBoundingClientRect();
+  const xClick = ev.clientX - rect.left;
+  const yClick = ev.clientY - rect.top;
+
+  let hover = false;
+  for (const n of notesData) {
+    if (n.status !== "active") continue;
+    const x = xScale.getPixelForValue(n.x);
+    const y = yScale.getPixelForValue(n.y);
+    const d = Math.hypot(x - xClick, y - yClick);
+    if (d < 25) {            // ← zone un peu plus large
+      hover = true;
+      break;
+    }
+  }
+
+  // évite les changements trop rapides
+  if (canvas.$lastHover !== hover) {
+    canvas.style.cursor = hover ? "pointer" : "default";
+    canvas.$lastHover = hover;
+  }
+});
+
+    }
   },
 };
+
 
 
 
@@ -1623,7 +1655,7 @@ document.getElementById("saveNoteBtn").addEventListener("click", async () => {
   try {
     const createdAt = new Date().toISOString();
 const response = await fetch(
-  "https://script.google.com/macros/s/AKfycbxiSr6IPoOoPrl61xOA4KUBN9y-P8OoKMIIPRKBUnqnV---FBS8iH3jVfWqPtHFXnw/exec",
+  "https://script.google.com/macros/s/AKfycbwNJcvZ7S99TC1vi3Z7zQMjw92CSx1_3wnszsaP_Yoy5zEHdJwXdPuWvy6vnIDFPUEj/exec",
 
       {
         method: "POST",
@@ -1710,7 +1742,7 @@ showConfirm("Confirmer la suppression de cette note ?", async () => {
     showPointEffect(note.x, note.y, "rgba(220,0,0,0.6)");
 
     const response = await fetch(
-      "https://script.google.com/macros/s/AKfycbxiSr6IPoOoPrl61xOA4KUBN9y-P8OoKMIIPRKBUnqnV---FBS8iH3jVfWqPtHFXnw/exec",
+      "https://script.google.com/macros/s/AKfycbwNJcvZ7S99TC1vi3Z7zQMjw92CSx1_3wnszsaP_Yoy5zEHdJwXdPuWvy6vnIDFPUEj/exec",
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1864,41 +1896,6 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
