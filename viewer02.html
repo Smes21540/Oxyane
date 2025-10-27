@@ -392,7 +392,10 @@
   <script>
   /* ===================== CONFIG / STATE ===================== */
     let csvData=[], chart, currentX="", currentY=[];
+    let notesData = []; // 🗒️ Liste des notes actives à afficher sur le graphe
     let currentFolderId = null; // 🧩 dossier actuel du CSV
+    let currentFolderPath = ""; // 🆕 texte lisible du dossier courant
+
 
   let baseFileName="", baseFileId="", headers=[], timeField="", baseDateYYYYMMDD="";
   let colors=[]; let themeMenuTimer;
@@ -532,10 +535,14 @@ try {
     currentFolderId = null;
   }
 
-  // affiche juste le nom du dossier courant (facultatif)
-  const folder = list.find(x => x.id === currentFolderId);
-  document.getElementById("currentFolderName").textContent =
-    folder ? folder.name : "(Dossier inconnu)";
+// affiche le nom du dossier courant et mémorise le "chemin" texte
+const folder = list.find(x => x.id === currentFolderId);
+const folderName = folder ? folder.name : "(Dossier inconnu)";
+document.getElementById("currentFolderName").textContent = folderName;
+
+// 🧭 on conserve au moins le nom du dossier comme chemin texte
+currentFolderPath = folder ? folder.name : "";
+
 } catch (e) {
   console.warn("⚠️ Erreur récupération dossier courant", e);
 }
@@ -1683,6 +1690,24 @@ document.getElementById("saveNoteBtn").addEventListener("click", async () => {
 
   try {
     const createdAt = new Date().toISOString();
+
+    // 🔍 Log des données envoyées au Script Google
+    const payload = {
+      id: crypto.randomUUID(),
+      csvName: baseFileName || "inconnu.csv",
+      fileId: baseFileId,
+      folderId: localStorage.getItem("lastFolderId") || "",
+      author: authorInput.value || "Anonyme",
+      note: content,
+      x: clickedPoint ? clickedPoint.x : "",
+      y: clickedPoint ? clickedPoint.y : "",
+      createdAt: createdAt,
+      status: "active",
+      dossier: currentFolderPath || ""   // 🆕 chemin texte du dossier (simple texte)
+    };
+    console.log("📤 Données envoyées au Script Google :", payload);
+
+    
 const response = await fetch(
   "https://script.google.com/macros/s/AKfycbwNJcvZ7S99TC1vi3Z7zQMjw92CSx1_3wnszsaP_Yoy5zEHdJwXdPuWvy6vnIDFPUEj/exec",
 
@@ -1690,16 +1715,17 @@ const response = await fetch(
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
 body: new URLSearchParams({
-  id: crypto.randomUUID(),                        // 🆔 identifiant unique
+  id: crypto.randomUUID(),
   csvName: baseFileName || "inconnu.csv",
   fileId: baseFileId,
-  folderId: localStorage.getItem("lastFolderId"),  // ✅ bon dossier conservé
+  folderId: localStorage.getItem("lastFolderId"),
   author: authorInput.value || "Anonyme",
   note: content,
   x: clickedPoint ? clickedPoint.x : "",
   y: clickedPoint ? clickedPoint.y : "",
   createdAt: createdAt,
-  status: "active"                                // ✅ statut explicite
+  status: "active",
+  dossier: currentFolderPath || ""   // 🆕 ajouté ici
 })
 
 
@@ -1925,6 +1951,11 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
+
+
+
+
+
 
 
 
