@@ -639,8 +639,70 @@ while (parentLi) {
     f.name.toLowerCase().endsWith('.jpg') || 
     f.name.toLowerCase().endsWith('.jpeg')
   );
-  imageFiles = filtered.filter(f => /\.(jpg|jpeg)$/i.test(f.name)); // pour la modale
-  displayFiles(filtered, nameSpan ? nameSpan.textContent : '');
+
+
+
+
+
+// 🧭 Détermination du site courant
+const siteLi = li.parentElement.closest("li");
+let siteId = siteLi?.dataset.id || null;
+
+if (siteId && siteId !== currentSiteId) {
+  clearSiteHotDays();
+  currentSiteId = siteId;
+  console.log(`[SITE] Changement de site → ${siteLi.querySelector(".folder-name")?.textContent}`);
+  
+// 🔥 Lancer le scan en arrière-plan sans bloquer l'affichage
+scanSiteHotDays(siteId).then(map => {
+  hotDaysMap = map;
+  console.log(`[CACHE] 🔥 ${Object.keys(hotDaysMap).length} jours chauds détectés et chargés pour ${siteLi.querySelector(".folder-name")?.textContent}`);
+
+  // 🪄 Rafraîchir seulement les flammes dans le tableau actuel
+  document.querySelectorAll('#csvTable tbody tr').forEach(tr => {
+    const nameCell = tr.cells[3]; // colonne Nom du fichier
+    const flameCell = tr.cells[1]; // colonne flamme
+    if (!nameCell || !flameCell) return;
+
+    const fname = nameCell.textContent.trim();
+    const m = fname.match(/(\d{8})\.csv$/i);
+    if (m && hotDaysMap[m[1]]) {
+      flameCell.innerHTML = `<span class="flame" title="Brûleur actif ce jour-là">🔥</span>`;
+    }
+  });
+});
+
+} else if (siteId && Object.keys(hotDaysMap).length === 0) {
+  hotDaysMap = loadSiteHotDays(siteId);
+  if (Object.keys(hotDaysMap).length === 0) {
+    console.log(`[CACHE] Aucun cache trouvé pour ${siteLi.querySelector(".folder-name")?.textContent}, relance du scan...`);
+    scanSiteHotDays(siteId).then(map => {
+      hotDaysMap = map;
+      console.log(`[CACHE] 🔥 ${Object.keys(hotDaysMap).length} jours chauds détectés et chargés pour ${siteLi.querySelector(".folder-name")?.textContent}`);
+      const active = document.querySelector('#folderTree .active-folder');
+      if (active) active.click();
+    });
+  } else {
+    console.log(`[CACHE] ${Object.keys(hotDaysMap).length} jours chauds chargés depuis cache`);
+  }
+}
+
+imageFiles = filtered.filter(f => /\.(jpg|jpeg)$/i.test(f.name)); 
+displayFiles(filtered, nameSpan ? nameSpan.textContent : '');
+
+
+// 🪄 Applique immédiatement les flammes du cache si déjà chargé pour ce site
+if (Object.keys(hotDaysMap).length > 0) {
+  document.querySelectorAll('#csvTable tbody tr').forEach(tr => {
+    const nameCell = tr.cells[3]; // colonne Nom du fichier
+    const flameCell = tr.cells[1]; // colonne flamme
+    if (!nameCell || !flameCell) return;
+
+    const m = nameCell.textContent.match(/(\d{8})\.csv$/i);
+    if (m && hotDaysMap[m[1]]) {
+      flameCell.innerHTML = `<span class="flame" title="Brûleur actif ce jour-là">🔥</span>`;
+    }
+  });
 }
 
 
@@ -676,6 +738,28 @@ const tr=document.createElement('tr');
 tdFlame.style.textAlign = "center";
 tdFlame.style.width = "26px";
 tdFlame.textContent = "";
+
+    
+
+    // 🔥 Application flamme si le fichier correspond à un jour chaud
+const match = f.name.match(/(\d{8})\.csv$/i);
+if (match) {
+  const dateKey = match[1];
+
+  // 🔥 flamme si déjà détectée dans le cache
+  if (hotDaysMap[dateKey]) {
+    tdFlame.innerHTML = `<span class="flame" title="Brûleur actif ce jour-là">🔥</span>`;
+  } else {
+    // 🕓 attente de la fin du scan → on vérifie à nouveau après 1 seconde
+    setTimeout(() => {
+      if (hotDaysMap[dateKey]) {
+        tdFlame.innerHTML = `<span class="flame" title="Brûleur actif ce jour-là">🔥</span>`;
+      }
+    }, 1000);
+  }
+}
+
+
 
 
 // Bloc DATE avec affichage du jour
@@ -816,6 +900,7 @@ tr.appendChild(tdSize);
 
     tbody.appendChild(tr);
   }
+}
 }
 
 /* ----------- Open viewer (CSV list + index) ----------- */
@@ -1138,6 +1223,110 @@ function setTheme(theme){
   }
 }
 
+/* ----------- 🔥 Gestion des jours chauds par site ----------- */
+const FLAME_MIN_LINES = 5;
+let currentSiteId = null;
+let hotDaysMap = {}; // { 'YYYYMMDD': true }
+
+async function scanSiteHotDays(siteId) {
+  const hotDays = {};
+  console.time(`[SCAN] Durée scanSiteHotDays (${siteId})`);
+  console.log(`[SCAN] Scan du site ${siteId} → dossier Traça_Temp`);
+
+  try {
+    const siblings = await fetchFolderContents(siteId);
+    const tracatemp = siblings.find(s => 
+      s.mimeType === 'application/vnd.google-apps.folder' &&
+      (s.name.toLowerCase().includes("traça_temp") || s.name.toLowerCase().includes("traca_temp"))
+    );
+    if (!tracatemp) {
+      console.warn(`[SCAN] Aucun dossier Traça_Temp trouvé pour le site ${siteId}`);
+      return hotDays;
+    }
+
+    const files = await fetchFolderContents(tracatemp.id);
+    const csvFiles = files.filter(f => f.name.toLowerCase().endsWith(".csv"));
+    console.log(`[SCAN] ${csvFiles.length} CSV trouvés dans ${tracatemp.name}`);
+
+    for (const f of csvFiles) {
+      try {
+        const res = await fetch(
+          `https://smes21540.netlify.app/.netlify/functions/drive?id=${f.id}&name=${encodeURIComponent(f.name)}&site=Smes_Acces`
+        );
+        if (!res.ok) continue;
+
+        const text = await res.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+        if (lines.length < 2) continue;
+
+        const headers = lines[0].split(",").map(h => h.replace(/"/g, "").trim().toLowerCase());
+
+        // 🔍 2ème occurrence (comme ton ancien index)
+        let idxInf = headers.map((h,i)=>({h,i})).filter(o=>o.h.includes("sonde ac inf"))[1]?.i;
+        let idxSup = headers.map((h,i)=>({h,i})).filter(o=>o.h.includes("sonde ac sup"))[1]?.i;
+        if (idxInf === undefined && idxSup === undefined) continue;
+
+        let countFlame = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(",").map(c => c.replace(/"/g, "").trim());
+
+          // 🕔 ignore la nuit (<5h)
+          const timeStr = cols[0];
+          if (timeStr && /^(\d{2}):(\d{2})/.test(timeStr)) {
+            const [_, hh] = timeStr.match(/^(\d{2}):/);
+            const hour = parseInt(hh, 10);
+            if (hour < 5) continue;
+          }
+
+          const vInf = idxInf !== undefined ? parseFloat(cols[idxInf]) : NaN;
+          const vSup = idxSup !== undefined ? parseFloat(cols[idxSup]) : NaN;
+
+          if ((isFinite(vInf) && vInf > FLAME_THRESHOLD) ||
+              (isFinite(vSup) && vSup > FLAME_THRESHOLD)) {
+            countFlame++;
+          }
+        }
+
+        if (countFlame >= 1) {
+          const m = f.name.match(/(\d{8})\.csv$/i);
+          if (m) hotDays[m[1]] = true;
+        }
+
+      } catch (e) {
+        console.warn(`[SCAN] Erreur lecture fichier ${f.name}:`, e);
+      }
+    }
+
+    console.log(`[SCAN] 🔥 ${Object.keys(hotDays).length} jours chauds détectés pour le site`);
+    console.timeEnd(`[SCAN] Durée scanSiteHotDays (${siteId})`);
+    localStorage.setItem(`hotDays_${siteId}`, JSON.stringify(hotDays));
+    return hotDays;
+
+  } catch (err) {
+    console.error("[SCAN] Erreur générale scanSiteHotDays:", err);
+    console.timeEnd(`[SCAN] Durée scanSiteHotDays (${siteId})`);
+    return hotDays;
+  }
+}
+
+
+function loadSiteHotDays(siteId) {
+  const data = localStorage.getItem(`hotDays_${siteId}`);
+  return data ? JSON.parse(data) : {};
+}
+
+
+function clearSiteHotDays() {
+  if (currentSiteId) {
+    localStorage.removeItem(`hotDays_${currentSiteId}`);
+  }
+  hotDaysMap = {};
+  currentSiteId = null;
+}
+
+
+
+  
 /* ----------- 🔥 Vérif CSV du jour pour "Temp" ----------- */
 async function checkTraçaTempToday(parentLi, tracatempId) {
   const today = new Date();
@@ -1195,16 +1384,20 @@ const res = await fetch(url);
 }
 
 function markFolderWithFlame(li) {
+  if (!li) return; // sécurité
+
   const span = li.querySelector(".folder-name");
-  if (span && !span.classList.contains("has-flame")) {
+  if (!(span instanceof HTMLElement)) return; // évite les erreurs de type
+
+  if (!span.classList.contains("has-flame")) {
     span.classList.add("has-flame");
     span.innerHTML = `<span class="flame-folder" title="Brûleur(s) actuellement en fonctionnement">🔥</span> ` + span.innerHTML;
+  }
 
-  }
-  if (li.parentElement && li.parentElement.closest("li")) {
-    markFolderWithFlame(li.parentElement.closest("li"));
-  }
+  const parent = li.parentElement?.closest("li");
+  if (parent) markFolderWithFlame(parent);
 }
+
 
 
 
@@ -1219,30 +1412,20 @@ window.onload=()=>{
   document.getElementById("downloadFolderBtn").style.display="none";
 
   loadRootFolders();
-  const last=localStorage.getItem('lastFolderId');
-  if(last){
-    const temp={dataset:{id:last}, querySelector:()=>({classList:{add:()=>{}}})};
-    loadFolderFilesOnClick(temp);
-  }
+const last = localStorage.getItem("lastFolderId");
+if (last) {
+  // attendre un peu que l'arborescence soit rendue
+  setTimeout(() => {
+    const li = document.querySelector(`#folderTree li[data-id="${last}"]`);
+    if (li) {
+      loadFolderFilesOnClick(li);
+    } else {
+      console.warn("[INIT] Impossible de retrouver le dernier dossier ouvert :", last);
+    }
+  }, 1200);
+}
+
 };
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
