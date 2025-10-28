@@ -68,8 +68,15 @@ body{
 
 /* ===== PAGE LAYOUT : main (3/4) + side (1/4) ===== */
 #pageWrap{
-  flex:1; display:flex; gap:10px; padding:10px 12px; overflow:hidden;
+  flex:1;
+  display:flex;
+  gap:10px;
+  padding:10px 12px;
+  overflow:hidden;
+  align-items:flex-start;   /* ✅ évite que la grille force le scroll vertical */
+  max-height:calc(100vh - 120px); /* ✅ limite le tout dans la fenêtre */
 }
+
 
 /* ===== Zone centrale : deux sous-grilles 22×6 centrées ===== */
 #mainCol{
@@ -81,9 +88,13 @@ body{
 }
 
 #gridWrap{
-  flex:1; display:flex; align-items:center; justify-content:center;
-  overflow:auto;
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;  /* ✅ pas de scrollbar dans la zone tuiles */
 }
+
 #grid{
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap: calc(var(--tile-size) * var(--split-gap)); /* espace vertical entre top/bottom */
@@ -105,9 +116,10 @@ body{
   box-shadow:0 2px 5px rgba(0,0,0,0.2); padding:6px;
   overflow:hidden;
 }
-.sonde .label{ font-size: clamp(10px, calc(var(--tile-size)*0.12), 14px); font-weight:bold; color:#000; margin-bottom:2px; }
-.sonde .consigne{ font-size: clamp(9px, calc(var(--tile-size)*0.10), 12px); color:#555; font-style:italic; }
-.sonde .val{ font-size: clamp(14px, calc(var(--tile-size)*0.18), 22px); font-weight:bold; color:#000; }
+.sonde .label{ font-size: clamp(9px, calc(var(--tile-size)*0.11), 13px); font-weight:bold; color:#000; margin-bottom:2px; }
+.sonde .consigne{ font-size: clamp(8px, calc(var(--tile-size)*0.09), 11px); color:#555; font-style:italic; }
+.sonde .val{ font-size: clamp(13px, calc(var(--tile-size)*0.16), 20px); font-weight:bold; color:#000; }
+
 
 /* ===== Cases spéciales ===== */
 .sonde.special {
