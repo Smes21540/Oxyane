@@ -839,10 +839,12 @@ const notesPlugin = {
     const canvas = chart.canvas;
 
     ctx.save();
-    ctx.font = "20px Segoe UI Emoji";
+    ctx.font = "12px Segoe UI";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = getCSSVar("--danger") || "red";
+
+    // Liste des zones de clic calculées
+    chart.$noteHitZones = [];
 
     notesData.forEach(n => {
       if (n.status !== "active") return;
@@ -850,61 +852,77 @@ const notesPlugin = {
       const y = yScale.getPixelForValue(n.y);
       if (x < xScale.left || x > xScale.right) return;
       if (y < yScale.top || y > yScale.bottom) return;
-      ctx.fillText("🖊️", x, y);
+
+      const text = n.text || n.note || "(note vide)";
+
+      // 🌿 Gestion des retours à la ligne automatiques
+      const maxWidth = 160; // largeur max de l’étiquette
+      const words = text.split(" ");
+      const lines = [];
+      let line = "";
+      for (let w of words) {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width > maxWidth) {
+          lines.push(line);
+          line = w;
+        } else line = test;
+      }
+      if (line) lines.push(line);
+
+      const paddingX = 8;
+      const paddingY = 4;
+      const boxWidth = Math.min(maxWidth, Math.max(...lines.map(l => ctx.measureText(l).width)) + paddingX * 2);
+      const boxHeight = lines.length * 16 + paddingY * 2;
+
+      // 🎨 Fond blanc semi-transparent + léger contour
+      const panel = getCSSVar("--panel") || "#fff";
+      const accent = getCSSVar("--accent") || "#000";
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.roundRect(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // ✏️ Texte sur plusieurs lignes
+      ctx.fillStyle = getCSSVar("--danger") || "red";
+      lines.forEach((l, i) => {
+        ctx.fillText(l, x, y - (boxHeight / 2) + paddingY + 8 + i * 14);
+      });
+
+      // 🧭 Sauvegarde zone de clic (pour survol / ouverture)
+      chart.$noteHitZones.push({
+        note: n,
+        x1: x - boxWidth / 2,
+        y1: y - boxHeight / 2,
+        x2: x + boxWidth / 2,
+        y2: y + boxHeight / 2
+      });
     });
+
     ctx.restore();
 
-    // ===== Gestion du survol et tooltip =====
+    // ===== Gestion du survol et du curseur =====
     const rect = canvas.getBoundingClientRect();
     const mouse = chart.$mousePos;
-
     let hovered = null;
-    if (mouse) {
-      for (const n of notesData) {
-        if (n.status !== "active") continue;
-        const x = xScale.getPixelForValue(n.x);
-        const y = yScale.getPixelForValue(n.y);
-        const d = Math.hypot(mouse.x - x, mouse.y - y);
-        if (d < 20) { hovered = n; break; }
+
+    if (mouse && chart.$noteHitZones) {
+      for (const zone of chart.$noteHitZones) {
+        const { x1, y1, x2, y2, note } = zone;
+        const x = mouse.x;
+        const y = mouse.y;
+        if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+          hovered = note;
+          break;
+        }
       }
     }
 
     canvas.style.cursor = hovered ? "pointer" : "default";
 
-    // ===== Dessin tooltip =====
-    if (hovered) {
-      const x = xScale.getPixelForValue(hovered.x);
-      const y = yScale.getPixelForValue(hovered.y);
-      const text = hovered.text || hovered.note || "(note vide)";
-      const panel = getCSSVar("--panel") || "#fff";
-      const accent = getCSSVar("--accent") || "black";
-
-      ctx.save();
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      const padding = 6;
-      const lines = ctx.measureText(text);
-      const width = Math.min(220, lines.width + padding * 2);
-      const height = 28;
-      const boxX = x - width / 2;
-      const boxY = y - 35; // un peu au-dessus du stylo
-
-      ctx.fillStyle = panel;
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1;
-      ctx.shadowColor = "rgba(0,0,0,0.25)";
-      ctx.shadowBlur = 3;
-      ctx.beginPath();
-      ctx.roundRect(boxX, boxY, width, height, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = accent;
-      ctx.fillText(text, x, boxY + height / 2);
-      ctx.restore();
-    }
-
-    // ===== Mise à jour de la position de la souris =====
+    // Mise à jour position souris
     if (!chart.$mousemoveHandlerAttached) {
       chart.$mousemoveHandlerAttached = true;
       canvas.addEventListener("mousemove", (ev) => {
@@ -919,6 +937,9 @@ const notesPlugin = {
     }
   },
 };
+
+
+
 
 
 
@@ -1979,6 +2000,9 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
+
+
+
 
 
 
