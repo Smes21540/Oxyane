@@ -541,7 +541,23 @@ const folderName = folder ? folder.name : "(Dossier inconnu)";
 document.getElementById("currentFolderName").textContent = folderName;
 
 // 🧭 on conserve au moins le nom du dossier comme chemin texte
-currentFolderPath = folder ? folder.name : "";
+currentFolderPath = getParam("folderPath") || (folder ? folder.name : "");
+
+// 🔹 Récupération du chemin complet du dossier
+let folderPath = new URLSearchParams(window.location.search).get("folderPath");
+
+// 🔹 Si pas trouvé dans l’URL (ou test local), on le reprend du localStorage
+if (!folderPath || folderPath.trim() === "") {
+  folderPath = localStorage.getItem("currentFolderPath") || "";
+}
+
+// 🔹 Pour vérif
+console.log("[Viewer02] Chemin dossier récupéré :", folderPath);
+
+// 🔹 On synchronise la variable globale
+currentFolderPath = folderPath;
+
+  
 
 } catch (e) {
   console.warn("⚠️ Erreur récupération dossier courant", e);
@@ -1708,29 +1724,41 @@ document.getElementById("saveNoteBtn").addEventListener("click", async () => {
     console.log("📤 Données envoyées au Script Google :", payload);
 
     
+// 🌐 Récupération de l’adresse IP publique du visiteur
+let ip = "inconnue";
+try {
+  const ipRes = await fetch("https://api.ipify.org?format=json");
+  if (ipRes.ok) {
+    const ipData = await ipRes.json();
+    ip = ipData.ip || "inconnue";
+  }
+} catch {
+  console.warn("Impossible de récupérer l’IP publique");
+}
+
+// 📨 Envoi au script Google
 const response = await fetch(
-  "https://script.google.com/macros/s/AKfycbwNJcvZ7S99TC1vi3Z7zQMjw92CSx1_3wnszsaP_Yoy5zEHdJwXdPuWvy6vnIDFPUEj/exec",
+  "https://script.google.com/macros/s/AKfycbz9zcweeyv7GpC4ZCLnw57uVvuHEOWEmfbvnLHVaqZ8Php179viedbf7PX8Vmi8HhTX7Q/exec",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      id: crypto.randomUUID(),
+      csvName: baseFileName || "inconnu.csv",
+      fileId: baseFileId,
+      folderId: localStorage.getItem("lastFolderId"),
+      author: authorInput.value || "Anonyme",
+      note: content,
+      x: clickedPoint ? clickedPoint.x : "",
+      y: clickedPoint ? clickedPoint.y : "",
+      createdAt,
+      status: "active",
+      dossier: currentFolderPath || "",
+      ip // ✅ ajout de l’IP ici
+    })
+  }
+);
 
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-body: new URLSearchParams({
-  id: crypto.randomUUID(),
-  csvName: baseFileName || "inconnu.csv",
-  fileId: baseFileId,
-  folderId: localStorage.getItem("lastFolderId"),
-  author: authorInput.value || "Anonyme",
-  note: content,
-  x: clickedPoint ? clickedPoint.x : "",
-  y: clickedPoint ? clickedPoint.y : "",
-  createdAt: createdAt,
-  status: "active",
-  dossier: currentFolderPath || ""   // 🆕 ajouté ici
-})
-
-
-      }
-    );
 
     const textRes = await response.text();
     console.log("Réponse serveur:", textRes);
@@ -1797,7 +1825,7 @@ showConfirm("Confirmer la suppression de cette note ?", async () => {
     showPointEffect(note.x, note.y, "rgba(220,0,0,0.6)");
 
     const response = await fetch(
-      "https://script.google.com/macros/s/AKfycbwNJcvZ7S99TC1vi3Z7zQMjw92CSx1_3wnszsaP_Yoy5zEHdJwXdPuWvy6vnIDFPUEj/exec",
+      "https://script.google.com/macros/s/AKfycbz9zcweeyv7GpC4ZCLnw57uVvuHEOWEmfbvnLHVaqZ8Php179viedbf7PX8Vmi8HhTX7Q/exec",
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1951,6 +1979,11 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
+
+
+
+
+
 
 
 
