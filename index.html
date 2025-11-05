@@ -100,16 +100,83 @@ body{
 }
 .controls button:hover{background:var(--accent-darker);transform:scale(1.05);}
 
-/* Champs date + icône custom */
-.date-field{
-  display:flex;align-items:center;gap:6px;background:var(--panel);
-  border:2px solid var(--table-border);border-radius:6px;padding:4px 8px;
+/* --- Champs date modernisés --- */
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 2px solid var(--table-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: all 0.3s ease;
 }
-.date-field span{font-size:16px;color:var(--accent);cursor:pointer;user-select:none;transition:0.2s;}
-.date-field span:hover{transform:scale(1.2);}
-.date-field input[type=date]{border:none;outline:none;background:transparent;font-size:14px;color:var(--text);padding:6px 2px;}
-input[type="date"]::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none;}
-.date-field input[type=date]:focus {box-shadow:0 0 6px var(--accent);border-color:var(--accent);color:var(--danger);}
+
+/* 📅 Icône calendrier plus grande et cliquable */
+.date-field span {
+  font-size: 24px; /* plus visible */
+  color: var(--accent);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s, color 0.2s;
+}
+.date-field span:hover {
+  transform: scale(1.2);
+  color: var(--accent-darker);
+}
+
+/* Masque le champ tant qu’aucune date n’est choisie */
+/* Flatpickr remplace les inputs type="date" par .flatpickr-input */
+.date-field .flatpickr-input {
+  display: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--text);
+  padding: 6px 2px;
+}
+.date-field.has-date .flatpickr-input {
+  display: inline-block;
+}
+
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* --- Style équilibré du calendrier Flatpickr --- */
+.flatpickr-calendar {
+  font-size: 1em !important;          /* ✅ police normale (plus de chevauchement) */
+  transform: scale(1.15);             /* ✅ zoom global du calendrier (plus grand sans grossir le texte) */
+  transform-origin: top left;         /* garde l’ouverture propre près de l’icône */
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  border-radius: 12px;
+  z-index: 3000 !important;
+}
+
+.flatpickr-day {
+  width: 2.4em !important;
+  height: 2.4em !important;
+  line-height: 2.4em !important;
+  font-size: 0.95em !important;       /* ✅ jours un peu plus petits, lisibles */
+  font-weight: 500;
+}
+
+.flatpickr-months .flatpickr-month {
+  font-size: 1em;                     /* ✅ mois et navigation lisibles mais pas énormes */
+  font-weight: bold;
+}
+
+.flatpickr-weekday {
+  font-size: 0.85em;                  /* ✅ noms des jours ajustés */
+  color: var(--accent-darker);
+  font-weight: 600;
+}
+
+
+
 
 /* Tableau */
 #tableWrapper{flex:1;overflow:auto;}
@@ -319,9 +386,34 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
   color: #0d47a1;
 }
 
+/* --- Jours chauds dans le calendrier --- */
+.hot-day {
+  background: var(--accent-muted) !important;
+  color: var(--danger) !important;
+  border-radius: 50% !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 6px rgba(255, 100, 0, 0.6);
+}
 
+
+/* Cache le bloc de filtres de date tant qu’aucun dossier n’est sélectionné */
+.controls {
+  display: none;
+}
+
+
+
+  
 
 </style>
+
+<!-- Calendrier enrichi -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
+
+
+  
 </head>
 <body>
 
@@ -510,6 +602,10 @@ async function loadRootFolders(){
   const rootUL = document.getElementById('folderTree');
   rootUL.innerHTML = '';
 
+// 🔒 Cacher les filtres quand on revient à la racine
+document.querySelector(".controls").style.display = "none";
+
+  
   files
   .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
   .sort((a,b) => a.name.localeCompare(b.name, 'fr', { sensitivity:'base' }))
@@ -802,6 +898,10 @@ async function displayFiles(files, folderName){
   const tbody=document.querySelector('#csvTable tbody');
   const downloadBtn=document.getElementById('downloadFolderBtn');
   tbody.innerHTML='';
+
+  // ✅ Afficher les filtres uniquement dans un dossier final (contenant des fichiers)
+document.querySelector(".controls").style.display = "flex";
+
 
   if(files.length===0){
     tbody.innerHTML='<tr><td colspan="5" style="text-align:center;">Aucun fichier</td></tr>';
@@ -1420,9 +1520,6 @@ function sortTable(colIndex, type) {
   if (arrow) arrow.textContent = currentSort.asc ? "▲" : "▼";
 }
 
-/* ----------- Icônes calendrier cliquables ----------- */
-document.getElementById("iconStart").onclick=()=>document.getElementById("startDate").showPicker?.()||document.getElementById("startDate").focus();
-document.getElementById("iconEnd").onclick=()=>document.getElementById("endDate").showPicker?.()||document.getElementById("endDate").focus();
 
 /* ----------- Menu secret (thèmes) ----------- */
 document.getElementById("secretBtn").onclick=()=>{
@@ -1518,10 +1615,11 @@ async function scanSiteHotDays(siteId) {
       s.mimeType === 'application/vnd.google-apps.folder' &&
       (s.name.toLowerCase().includes("traça_temp") || s.name.toLowerCase().includes("traca_temp"))
     );
-    if (!tracatemp) {
-      console.warn(`[SCAN] Aucun dossier Traça_Temp trouvé pour le site ${siteId}`);
-      return hotDays;
-    }
+if (!tracatemp) {
+  console.warn(`[SCAN] Aucun dossier Traça_Temp trouvé pour le site ${siteId}`);
+  return hotDays;
+}
+
 
     const files = await fetchFolderContents(tracatemp.id);
     const csvFiles = files.filter(f => f.name.toLowerCase().endsWith(".csv"));
@@ -1576,10 +1674,15 @@ async function scanSiteHotDays(siteId) {
       }
     }
 
-    console.log(`[SCAN] 🔥 ${Object.keys(hotDays).length} jours chauds détectés pour le site`);
-    console.timeEnd(`[SCAN] Durée scanSiteHotDays (${siteId})`);
-    localStorage.setItem(`hotDays_${siteId}`, JSON.stringify(hotDays));
-    return hotDays;
+console.log(`[SCAN] 🔥 ${Object.keys(hotDays).length} jours chauds détectés pour le site`);
+console.timeEnd(`[SCAN] Durée scanSiteHotDays (${siteId})`);
+localStorage.setItem(`hotDays_${siteId}`, JSON.stringify(hotDays));
+
+// ✅ Recharge les calendriers maintenant que hotDaysMap est prêt
+initDatePickers();
+
+return hotDays;
+
 
   } catch (err) {
     console.error("[SCAN] Erreur générale scanSiteHotDays:", err);
@@ -1678,6 +1781,94 @@ function markFolderWithFlame(li) {
 }
 
 
+/* ----------- Datepickers enrichis (Flatpickr) ----------- */
+let fpStart = null;
+let fpEnd = null;
+
+function initDatePickers() {
+  const commonOpts = {
+    dateFormat: "Y-m-d",
+    locale: flatpickr.l10ns.fr, // ✅ langue française correcte
+    allowInput: true,
+    clickOpens: true,
+
+    // 💡 Dès l’ouverture → coloration immédiate des jours chauds
+    onOpen: function(selectedDates, dateStr, instance) {
+      recolorHotDays(instance);
+    },
+    onReady: function(selectedDates, dateStr, instance) {
+      recolorHotDays(instance);
+    },
+    onMonthChange: function(selectedDates, dateStr, instance) {
+      recolorHotDays(instance);
+    },
+    onYearChange: function(selectedDates, dateStr, instance) {
+      recolorHotDays(instance);
+    },
+
+    onChange: function(selectedDates, dateStr, instance) {
+      const parent = instance.input.closest(".date-field");
+      if (dateStr) parent.classList.add("has-date");
+      else parent.classList.remove("has-date");
+    },
+
+onDayCreate: function(dObj, dStr, fp, dayElem) {
+  const yyyymmdd = dayElem.dateObj.getFullYear().toString() +
+    String(dayElem.dateObj.getMonth() + 1).padStart(2, "0") +
+    String(dayElem.dateObj.getDate()).padStart(2, "0");
+  if (hotDaysMap && hotDaysMap[yyyymmdd]) {
+    dayElem.classList.add("hot-day");
+    dayElem.title = "Jour chaud détecté";
+  }
+}
+
+  };
+
+  // 🔄 Détruire les anciens calendriers pour forcer le redraw
+  if (fpStart) fpStart.destroy();
+  if (fpEnd) fpEnd.destroy();
+
+// 📅 Icônes calendrier (plus grandes) + positionnement localisé
+const iconStart = document.getElementById("iconStart");
+const iconEnd = document.getElementById("iconEnd");
+
+fpStart = flatpickr("#startDate", {
+  ...commonOpts,
+  positionElement: iconStart, // 👈 s’affiche collé à l’icône
+});
+fpEnd = flatpickr("#endDate", {
+  ...commonOpts,
+  positionElement: iconEnd,   // 👈 idem
+});
+
+// 📅 clic sur les icônes pour ouvrir le calendrier
+if (iconStart) iconStart.onclick = () => fpStart.open();
+if (iconEnd) iconEnd.onclick = () => fpEnd.open();
+
+}
+
+
+/* ----------- Coloration des jours chauds ----------- */
+function recolorHotDays(instance) {
+  const days = instance.calendarContainer.querySelectorAll(".flatpickr-day");
+  days.forEach(dayElem => {
+    const yyyymmdd = dayElem.dateObj.getFullYear().toString() +
+  String(dayElem.dateObj.getMonth() + 1).padStart(2, "0") +
+  String(dayElem.dateObj.getDate()).padStart(2, "0");
+
+    if (hotDaysMap && hotDaysMap[yyyymmdd]) {
+      dayElem.classList.add("hot-day");
+      dayElem.title = "Jour chaud détecté";
+    } else {
+      dayElem.classList.remove("hot-day");
+      dayElem.removeAttribute("title");
+    }
+  });
+}
+
+
+
+
 
 
 
@@ -1691,6 +1882,7 @@ window.onload=()=>{
   document.getElementById("downloadFolderBtn").style.display="none";
 
   loadRootFolders();
+  initDatePickers();
 const last = localStorage.getItem("lastFolderId");
 if (last) {
   // attendre un peu que l'arborescence soit rendue
@@ -1708,5 +1900,32 @@ if (last) {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
