@@ -638,6 +638,11 @@ setTimeout(() => {
     enrichRowsWithDate(csvData,baseDateYYYYMMDD);
     loadedDays.add(baseDateYYYYMMDD);
   }
+  } catch (e) {
+    console.error("Erreur dans loadCSVFromDrive :", e);
+    showError();
+  }
+  
 }
 
 
@@ -2048,6 +2053,7 @@ function showConfirm(message, onConfirm) {
   
 </body>
 </html>
+
 
 
 
