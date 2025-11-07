@@ -580,6 +580,8 @@ tbody tr:hover .action-btn{opacity:1;visibility:visible;}
 <script>
 /* ----------- Config Drive ----------- */
 const ROOT_FOLDER_ID="18QkQPyCZxTCAaoz_qd1wAelmQbSE4ex8";
+// ✅ Active/désactive les calculs de consommation gaz
+const ENABLE_GAZ_CALC = true;  // ← passe à false pour désactiver
 
 /* ----------- Config personnalisée ----------- */
 const FLAME_THRESHOLD = 40.0;   // seuil déclencheur de la flamme 🔥
@@ -689,10 +691,10 @@ span.className = 'folder-name';
 
 const lowerName = f.name.toLowerCase();
 
-if (lowerName.includes("consommation")) {
+if (lowerName.includes("gaz")) {
   span.innerHTML = `⛽ ${f.name}`;
 } else if (lowerName.includes("echantillonnage")) {
-  span.innerHTML = `📊 ${f.name}`;
+  span.innerHTML = `📖 ${f.name}`;
 } else if (lowerName.includes("capture")) {
   span.innerHTML = `🖼️ ${f.name}`;
 } else if (lowerName.includes("rapport")) {
@@ -767,10 +769,10 @@ span.className = 'folder-name';
 
 const lowerName = f.name.toLowerCase();
 
-if (lowerName.includes("consommation")) {
+if (lowerName.includes("gaz")) {
   span.innerHTML = `⛽ ${f.name}`;
 } else if (lowerName.includes("echantillonnage")) {
-  span.innerHTML = `📊 ${f.name}`;
+  span.innerHTML = `📖 ${f.name}`;
 } else if (lowerName.includes("capture")) {
   span.innerHTML = `🖼️ ${f.name}`;
 } else if (lowerName.includes("rapport")) {
@@ -1236,7 +1238,8 @@ if(f.name.toLowerCase().endsWith('.csv')){
 }
 
 // === Si on est dans "Consommation Gaz", calcul du delta sur colonnes 2 (heure HH:MM:SS) et 3 (kWh) ===
-if (folderName.toLowerCase().includes("consommation gaz") && f.name.toLowerCase().endsWith(".csv")) {
+if (ENABLE_GAZ_CALC && folderName.toLowerCase().includes("consommation gaz") && f.name.toLowerCase().endsWith(".csv")) {
+
 html += `
   <div class="gaz-group">
     <button class="gaz-btn" disabled>⏳ Calcul...</button>
@@ -1303,27 +1306,51 @@ html += `
       const btnKwh = btns[0];
       const btnHeures = btns[1];
 
-      // ⚡ KWH
-      if (btnKwh) {
-        btnKwh.textContent = `🔥 ${roundedKwh} kWh`;
+if (diffKwh > 400000) {
+  const btns = tdAction.querySelectorAll(".gaz-btn");
+  const btnKwh = btns[0];
+  if (btnKwh) {
+    btnKwh.textContent = `⚠️ ${diffKwh.toFixed(0)} kWh (valeur anormale)`;
+    btnKwh.style.background = "linear-gradient(180deg, #ffccbc, #d32f2f)";
+    btnKwh.style.color = "#fff";
+    btnKwh.style.transform = "scale(1)";
+  }
+  return; // 🔴 on arrête ici, pas d'animation ni de couleur normale
+}
 
-        const minScale = 0.85, maxScale = 1.4;
-        const normalized = Math.min(Math.max(diffKwh / 200000, 0), 1);
-        const scale = minScale + (maxScale - minScale) * normalized;
-        btnKwh.style.transform = `scale(${scale.toFixed(2)})`;
-        btnKwh.style.transition = "transform 0.6s ease-out";
+      
+// ⚡ KWH (couleur douce selon consommation)
+if (btnKwh) {
+  btnKwh.textContent = `🔥 ${roundedKwh} kWh`;
+  btnKwh.style.transition = "background 0.8s ease-out, color 0.8s ease-out";
 
-        if (diffKwh > 100000) {
-          btnKwh.style.background = "linear-gradient(180deg, #ffcc80, #f57c00)";
-          btnKwh.style.color = "#3e2723";
-        } else if (diffKwh > 50000) {
-          btnKwh.style.background = "linear-gradient(180deg, #ffe082, #ffb300)";
-          btnKwh.style.color = "#4e342e";
-        } else {
-          btnKwh.style.background = "linear-gradient(180deg, #fff176, #ffd54f)";
-          btnKwh.style.color = "#5d4037";
-        }
-      }
+  // Limiter la valeur pour éviter les extrêmes
+  const v = Math.min(Math.max(diffKwh, 0), 200000);
+
+  let bg = "";
+  let textColor = "#1b5e20"; // vert foncé par défaut
+
+  if (v <= 10000) {
+    // vert clair → jaune
+    const ratio = v / 10000;
+    const g = Math.round(230 - 60 * ratio);
+    const r = Math.round(200 + 55 * ratio);
+    bg = `linear-gradient(180deg, rgb(${r},${g},100), rgb(${r + 20},${g + 20},120))`;
+    textColor = "#2e7d32";
+  } else {
+    // jaune → rouge
+    const ratio = (v - 10000) / 190000;
+    const r = Math.round(255);
+    const g = Math.round(235 - 155 * ratio);
+    bg = `linear-gradient(180deg, rgb(${r},${g},80), rgb(${r - 20},${g - 30},60))`;
+    textColor = "#3e2723";
+  }
+
+  btnKwh.style.background = bg;
+  btnKwh.style.color = textColor;
+}
+
+
 
       // ⏱ HEURES (format HH:MM)
       if (btnHeures) {
@@ -1888,7 +1915,7 @@ function markFolderWithFlame(li) {
 
   if (!span.classList.contains("has-flame")) {
     span.classList.add("has-flame");
-    span.innerHTML = `<span class="flame-folder" title="Brûleur(s) actuellement en fonctionnement">🔥&nbsp;&nbsp;</span> ` + span.innerHTML;
+    span.innerHTML = `<span class="flame-folder" title="Brûleur(s) actuellement en fonctionnement">🔥</span> ` + span.innerHTML;
   }
 
   const parent = li.parentElement?.closest("li");
@@ -2015,6 +2042,12 @@ if (last) {
 </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 
