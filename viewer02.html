@@ -111,10 +111,29 @@
       border:1px solid var(--accent); border-radius:6px; padding:6px 10px; font-size:12px;
       color:var(--accent-darker); font-weight:bold; z-index:10; pointer-events:none;
     }
-    #spinner{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-      width:50px;height:50px;border:6px solid #f3f3f3;border-top:6px solid var(--accent);
-      border-radius:50%;animation:spin 1s linear infinite;z-index:2000;}
-    @keyframes spin{0%{transform:translate(-50%,-50%) rotate(0deg);}100%{transform:translate(-50%,-50%) rotate(360deg);}}
+#spinner {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+}
+
+.spin-inner {
+  width: 50px;
+  height: 50px;
+  border: 6px solid #ccc;
+  border-top: 6px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
     #errorBox{
       display:none;position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);
       background:var(--accent-muted);padding:20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.2);
@@ -311,6 +330,21 @@
   color: var(--muted-text);
 }
 
+.loader {
+  border: 4px solid #fff;
+  border-top: 4px solid transparent;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  margin-right: 12px;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+    
 
   </style>
 </head>
@@ -366,7 +400,10 @@
 
   <!-- === PARTIE 7 : Aides/états === -->
   <div id="zoomInfo">🔍 Sélectionner une zone (drag) pour zoomer, molette+Ctrl pour zoom, Ctrl+clic sur la courbe pour changer sa couleur</div>
-  <div id="spinner"></div>
+ <div id="spinner">
+  <div class="spin-inner"></div>
+</div>
+
   <div id="errorBox">
     ⚠️ Impossible de charger le fichier.<br>Vérifiez la connexion ou réessayez plus tard.<br><br>
     <button onclick="window.location.reload()">Réessayer</button>
@@ -1201,6 +1238,7 @@ if (!isNaN(dt.getTime())) {
     type:'line',
     data:{datasets},
     options:{
+      devicePixelRatio: 2, //Résolution canva
       responsive:true,
       maintainAspectRatio:false,
       parsing:false,
@@ -1633,107 +1671,125 @@ async function autoLoadDays(chart){
 
 
 
-  /* ===================== EXPORT PDF ===================== */
-  document.getElementById('exportPDF').onclick = () => {
-    if (!chart) { alert("Aucun graphique à exporter."); return; }
-    let jsPDFConstructor = null;
-    if (window.jspdf && window.jspdf.jsPDF) jsPDFConstructor = window.jspdf.jsPDF;
-    else if (window.jsPDF) jsPDFConstructor = window.jsPDF;
-    if (!jsPDFConstructor) { alert("jsPDF n’est pas chargé !"); return; }
+/* ===================== EXPORT PDF ===================== */
+document.getElementById('exportPDF').onclick = () => {
+    showSpinner();
 
-    const pdf = new jsPDFConstructor({ orientation: 'landscape' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
+    setTimeout(() => {   // <---- OUVERTURE
 
-    const csvName = (getParam('fileName') || '').split('\\').pop() || '';
-    let titleText = csvName;
-    let pdfFileName = csvName.replace(/\.csv$/i, '.pdf');
+        if (!chart) { alert("Aucun graphique à exporter."); return; }
+        let jsPDFConstructor = null;
+        if (window.jspdf && window.jspdf.jsPDF) jsPDFConstructor = window.jspdf.jsPDF;
+        else if (window.jsPDF) jsPDFConstructor = window.jsPDF;
+        if (!jsPDFConstructor) { alert("jsPDF n’est pas chargé !"); return; }
 
-    if (csvName.startsWith("Z")) {
-      const matchZ = csvName.match(/^Z\d+(\d{2})_(\d{8})/);
-      if (matchZ) {
-        const xx = parseInt(matchZ[1],10).toString();
-        const d = matchZ[2];
-        titleText = `Historique Séchoir ${xx} - ${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
-      }
-    } else {
-const match = csvName.match(/^SA(\d+)_([0-9]{8})/);
-if (match) {
-  const num = parseInt(match[1], 10);
-  const d = match[2];
+        const pdf = new jsPDFConstructor({ orientation: 'landscape' });
+        const pageWidth = pdf.internal.pageSize.getWidth();
 
-  // 🔹 Récupération du nom du dossier principal (comme avant)
-  const folderEl = document.getElementById("currentFolderName");
-  let folderName = folderEl ? folderEl.textContent.trim() : "SansNom";
+        const csvName = (getParam('fileName') || '').split('\\').pop() || '';
+        let titleText = csvName;
+      titleText = titleText.replace(/[📈📊📉🔥🗒️🚨✨⬅️📄🔄]/g, "").trim();
 
-// 🔹 Suppression de tout pictogramme type emoji (ex: 📈, 📊, etc.)
-folderName = folderName.replace(/[📈📊📉🔥🗒️🚨✨⬅️📄🔄]/g, "").trim();
+        let pdfFileName = csvName.replace(/\.csv$/i, '.pdf');
 
+        if (csvName.startsWith("Z")) {
+            const matchZ = csvName.match(/^Z\d+(\d{2})_(\d{8})/);
+            if (matchZ) {
+                const xx = parseInt(matchZ[1],10).toString();
+                const d = matchZ[2];
+                titleText = `Historique Séchoir ${xx} - ${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
+            }
+        } else {
+            const match = csvName.match(/^SA(\d+)_([0-9]{8})/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                const d = match[2];
 
-  const dateFR = `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
-  const numTxt = num > 0 ? `Séchoir ${num}` : "";
+                const folderEl = document.getElementById("currentFolderName");
+                let folderName = folderEl ? folderEl.textContent.trim() : "SansNom";
+                folderName = folderName.replace(/[📈📊📉🔥🗒️🚨✨⬅️📄🔄]/g, "").trim();
 
-  // 🔸 Titre affiché dans le PDF (propre, sans flammes)
-  titleText = titleText.replace(/[📈📊📉🔥🗒️🚨✨⬅️📄🔄]/g, "").trim();
-  titleText = num > 0
-    ? `${folderName} – ${numTxt} – ${dateFR}`
-    : `${folderName} – ${dateFR}`;
+                const dateFR = `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}`;
+                const numTxt = num > 0 ? `Séchoir ${num}` : "";
 
-  // 🔸 Nom de fichier PDF exporté (sécurisé)
-  const safeFolder = folderName
-    .replace(/[<>:"/\\|?*]/g, "_")
-    .replace(/\s+/g, "_");
+                titleText = titleText.replace(/[📈📊📉🔥🗒️🚨✨⬅️📄🔄]/g, "").trim();
+                titleText = num > 0
+                    ? `${folderName} – ${numTxt} – ${dateFR}`
+                    : `${folderName} – ${dateFR}`;
 
-  pdfFileName = num > 0
-    ? `${safeFolder}_S${String(num).padStart(2, "0")}_${d}.pdf`
-    : `${safeFolder}_${d}.pdf`;
+                const safeFolder = folderName
+                    .replace(/[<>:"/\\|?*]/g, "_")
+                    .replace(/\s+/g, "_");
 
-  // 🔸 Métadonnées PDF
-  pdf.setProperties({
-    title: `Courbes – ${folderName}${numTxt ? " – " + numTxt : ""} – ${dateFR}`,
-    subject: 'Export graphique CSV Séchoir',
-    author: 'SMES Explorer'
-  });
-}
+                pdfFileName = num > 0
+                    ? `${safeFolder}_S${String(num).padStart(2, "0")}_${d}.pdf`
+                    : `${safeFolder}_${d}.pdf`;
 
+                pdf.setProperties({
+                    title: `Courbes – ${folderName}${numTxt ? " – " + numTxt : ""} – ${dateFR}`,
+                    subject: 'Export graphique CSV Séchoir',
+                    author: 'SMES Explorer'
+                });
+            }
+        }
 
+        const danger = getCSSVar('--danger') || '#d84315';
+        const { r, g, b } = hexToRgb(danger);
+        const pdfSafeGrey = {r:50,g:50,b:50};
 
-    }
+        pdf.setFontSize(14);
+        pdf.setTextColor(r, g, b);
+        const lines = pdf.splitTextToSize(titleText, pageWidth - 20);
+        const titleY = 12;
+        pdf.text(lines, 14, titleY);
 
-    const danger = getCSSVar('--danger') || '#d84315';
-    const { r, g, b } = hexToRgb(danger);
-    const pdfSafeGrey = {r:50,g:50,b:50};
+        const canvas = chart.canvas;
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const scale = Math.min((pageWidth-20)/canvas.width, (pageHeight-60)/canvas.height);
+        const chartX = (pageWidth - canvas.width*scale)/2;
+        const chartY = titleY + 8 + lines.length*5;
 
-    pdf.setFontSize(14);
-    pdf.setTextColor(r, g, b);
-    const lines = pdf.splitTextToSize(titleText, pageWidth - 20);
-    const titleY = 12;
-    pdf.text(lines, 14, titleY);
+        const scaleFactor = 3;
+        const src = canvas;
 
-    const canvas = chart.canvas;
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const scale = Math.min((pageWidth-20)/canvas.width, (pageHeight-60)/canvas.height);
-    const chartX = (pageWidth - canvas.width*scale)/2;
-    const chartY = titleY + 8 + lines.length*5;
-    pdf.addImage(
-      canvas.toDataURL('image/png'),
-      'PNG',
-      chartX,
-      chartY,
-      canvas.width*scale,
-      canvas.height*scale
-    );
+        const hd = document.createElement("canvas");
+        hd.width = src.width * scaleFactor;
+        hd.height = src.height * scaleFactor;
 
-    const dateLabels = document.getElementById('dateLabels')?.textContent || "";
-    if (dateLabels) {
-      pdf.setFontSize(10);
-      pdf.setTextColor(pdfSafeGrey.r, pdfSafeGrey.g, pdfSafeGrey.b);
-      const yPos = chartY + canvas.height*scale + 15;
-      const wrapped = pdf.splitTextToSize(dateLabels, pageWidth - 20);
-      pdf.text(wrapped, pageWidth/2, yPos, { align: "center" });
-    }
+        const hctx = hd.getContext("2d");
+        hctx.scale(scaleFactor, scaleFactor);
+        hctx.imageSmoothingEnabled = false;
+        hctx.drawImage(src, 0, 0);
 
-    pdf.save(pdfFileName);
-  };
+        const imgData = hd.toDataURL("image/png");
+
+        pdf.addImage(
+            imgData,
+            "PNG",
+            chartX,
+            chartY,
+            canvas.width * scale,
+            canvas.height * scale
+        );
+
+        const dateLabels = document.getElementById('dateLabels')?.textContent || "";
+        if (dateLabels) {
+            pdf.setFontSize(10);
+            pdf.setTextColor(pdfSafeGrey.r, pdfSafeGrey.g, pdfSafeGrey.b);
+            const yPos = chartY + canvas.height*scale + 15;
+            const wrapped = pdf.splitTextToSize(dateLabels, pageWidth - 20);
+            pdf.text(wrapped, pageWidth/2, yPos, { align: "center" });
+        }
+
+        pdf.save(pdfFileName);
+
+        setTimeout(() => {
+            hideSpinner();
+        }, 800);
+
+    }, 30);  // <---- FERMETURE DU setTimeout PRINCIPAL
+};        // <---- FERMETURE DU onclick
+
 
   /* ===================== INIT ===================== */
   (async function(){
@@ -2275,9 +2331,19 @@ function showConfirm(message, onConfirm) {
   
 </script>
 
+
+
+  
   
 </body>
 </html>
+
+
+
+
+
+
+
 
 
 
