@@ -11,7 +11,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Explorateur données séchoirs</title>
+<title>Séchoirs Oxyane</title>
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌽</text></svg>">
 
@@ -595,6 +595,153 @@ let filterStartDate="", filterEndDate="";
 let themeMenuTimer;
 let cancelScan = false; // 🛑 permet d’arrêter le scan si on clique ailleurs
 
+async function getTonnageForDate(siteRoot, dateStr) {
+
+    console.log("=== TONNAGE DEBUG ===");
+    console.log("Site :", siteRoot);
+    console.log("Date :", dateStr);
+
+    try {
+        // On récupère le chemin complet actuel
+const path = (localStorage.getItem("lastFolderPath") || "").split("/");
+
+// Exemple : ["Valbonne","Consommation Gaz"]
+// On prend la racine du site : "Valbonne"
+const siteName = path[0];
+
+// On liste les dossiers au niveau du site
+const root = await fetchFolderContents(ROOT_FOLDER_ID);  // l’ID Drive de ton dossier principal
+
+// On trouve le dossier du site
+const siteFolder = root.find(f => f.name === siteName);
+
+if (!siteFolder) {
+    console.warn("❌ Impossible de trouver le dossier du site :", siteName);
+    return 0;
+}
+
+// Maintenant on scanne les sous-dossiers du site
+const folders = await fetchFolderContents(siteFolder.id);
+
+
+        const tracatemp = folders.find(f =>
+            f.mimeType === "application/vnd.google-apps.folder" &&
+            f.name.toLowerCase().includes("traça_temp")
+        );
+
+        if (!tracatemp) {
+            console.warn("❌ Dossier Traça_Temp introuvable !");
+            return 0;
+        }
+
+        console.log("✔ Dossier Traça_Temp trouvé :", tracatemp.name, tracatemp.id);
+
+        const files = await fetchFolderContents(tracatemp.id);
+
+        const csvName = `SA00094_${dateStr.replace(/-/g, "")}.csv`;
+
+        console.log("Recherche du fichier :", csvName);
+
+        const file = files.find(f => f.name.toLowerCase() === csvName.toLowerCase());
+
+        if (!file) {
+            console.warn("❌ Fichier non trouvé dans Traça_Temp :", csvName);
+            return 0;
+        }
+
+        console.log("✔ Fichier trouvé :", file.name, file.id);
+
+        // Téléchargement du CSV
+        const url = `https://smes21540.netlify.app/.netlify/functions/drive?id=${file.id}&name=${encodeURIComponent(file.name)}&site=Smes_Acces`;
+
+        console.log("Téléchargement depuis :", url);
+
+        const resp = await fetch(url);
+
+        if (!resp.ok) {
+            console.error("❌ Erreur téléchargement CSV :", resp.status);
+            return 0;
+        }
+
+        const text = await resp.text();
+
+        console.log("✔ CSV téléchargé, longueur :", text.length);
+
+        const lines = text.trim().split(/\r?\n/);
+
+        console.log("Nombre de lignes :", lines.length);
+
+        // === Nouveau parseur fiable ===
+        function parseCSV(line) {
+            const result = [];
+            let current = "";
+            let insideQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const c = line[i];
+
+                if (c === '"' && line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                }
+                else if (c === '"') {
+                    insideQuotes = !insideQuotes;
+                }
+                else if (c === "," && !insideQuotes) {
+                    result.push(current);
+                    current = "";
+                }
+                else {
+                    current += c;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        const header = parseCSV(lines[0]);
+
+        console.log("Header :", header);
+
+        const idx = header.indexOf("Cumul (tonnes)");
+
+        console.log("Index 'Cumul (tonnes)' :", idx);
+
+        if (idx === -1) {
+            console.warn("❌ Colonne 'Cumul (tonnes)' introuvable !");
+            return 0;
+        }
+
+        const firstLine = parseCSV(lines[1]);
+        const lastLine  = parseCSV(lines[lines.length - 1]);
+
+        console.log("Première ligne tonnage brute :", firstLine[idx]);
+        console.log("Dernière ligne tonnage brute :", lastLine[idx]);
+
+        const first = parseFloat(firstLine[idx].replace(",", "."));
+        const last  = parseFloat(lastLine[idx].replace(",", "."));
+
+        console.log("Parsed first =", first, "last =", last);
+
+        if (!isFinite(first) || !isFinite(last)) {
+            console.warn("❌ Valeurs tonnage invalides !");
+            return 0;
+        }
+
+        const diff = last - first;
+
+        console.log("✔ Tonnage calculé =", diff);
+
+        return diff;
+
+    } catch (e) {
+        console.error("💥 Exception tonnage :", e);
+        return 0;
+    }
+}
+
+
+  
 
 /* ----------- Utilitaires UI ----------- */
 const spinner=document.getElementById('spinner');
@@ -1417,6 +1564,32 @@ btnM3.style.minWidth = "120px";
       btnAvg.style.minWidth = "90px";
       btnAvg.style.fontSize = "12px";
 
+/* ===========================
+   📦 TONNAGE — Pré-calcul automatique
+   =========================== */
+
+const dateStr = tdDate.textContent.split(" ")[0]; // YYYY-MM-DD
+
+// 🔍 Récupère le chemin complet du site
+const fullPath = localStorage.getItem("lastFolderPath") || "";
+const siteRoot = fullPath.split("/")[0];   // ex: "Valbonne"
+
+// 🔧 Appel correct
+let tonnage = await getTonnageForDate(siteRoot, dateStr);
+
+if (!isFinite(tonnage)) tonnage = 0;
+
+// Stockage pour export CSV
+tr.dataset.tonnage = Number(tonnage.toFixed(1));
+
+
+
+if (!isFinite(tonnage)) tonnage = 0;
+
+// 🔥 Stockage invisible (export CSV le réutilisera)
+tr.dataset.tonnage = tonnage;
+
+
     } catch (err) {
       console.warn("Erreur GAZ:", err);
     }
@@ -2067,7 +2240,7 @@ function recolorHotDays(instance) {
 
 
 /* ----------- Export CSV (Gaz) ----------- */
-document.getElementById("exportCsvBtn").addEventListener("click", function () {
+document.getElementById("exportCsvBtn").addEventListener("click", async function () {
 
     const rows = Array.from(document.querySelectorAll("#csvTable tbody tr"))
         .filter(r => r.style.display !== "none");
@@ -2077,57 +2250,59 @@ document.getElementById("exportCsvBtn").addEventListener("click", function () {
         return;
     }
 
-    // En-tête
     let csv = "Date,ConsokWh,ConsoM3,Duree,DureeMinutes,Moyenne(kWh/h),Tonnage\n";
 
-    rows.forEach(row => {
+    for (const row of rows) {
 
         // --- DATE ---
-        let date = row.querySelector("td:nth-child(1)")?.textContent.split(" ")[0] || "";
+        let date = row.querySelector("td:nth-child(1)")?.textContent.split(" ")[0] || "0";
         if (!date) date = "0";
 
         const btns = row.querySelectorAll(".gaz-group .gaz-btn");
-        if (btns.length !== 4) return;
+        if (btns.length !== 4) continue;
 
         // --- KWH ---
-        let kwh = btns[0].textContent.replace(/[^\d.-]/g, "").trim();
+        let kwh = btns[0].textContent.replace(/[^\d.-]/g, "");
         if (kwh === "" || isNaN(kwh)) kwh = "0";
 
         // --- M3 ---
-        let m3 = btns[1].textContent.replace(/[^\d.-]/g, "").trim();
+        let m3 = btns[1].textContent.replace(/[^\d.-]/g, "");
         if (m3 === "" || isNaN(m3)) m3 = "0";
 
         // --- DUREE (HH:MM) ---
-        let duree = btns[2].textContent.replace(/[^0-9:]/g, "").trim();
+        let duree = btns[2].textContent.replace(/[^0-9:]/g, "");
         if (!duree.includes(":")) duree = "0";
 
-        // --- CALCUL DUREE EN MINUTES ---
-        let totalMinutes = 0;
+        // --- DUREE MINUTES ---
+        let mins = 0;
         if (duree !== "0") {
-            const parts = duree.split(":");
-            const h = parseInt(parts[0], 10);
-            const m = parseInt(parts[1], 10);
-            totalMinutes = (isNaN(h) || isNaN(m)) ? 0 : (h * 60 + m);
+            const p = duree.split(":");
+            const h = parseInt(p[0], 10);
+            const m = parseInt(p[1], 10);
+            mins = (isNaN(h) || isNaN(m)) ? 0 : (h * 60 + m);
         }
 
         // --- MOYENNE ---
-        let avg = btns[3].textContent.replace(/[^\d.-]/g, "").trim();
+        let avg = btns[3].textContent.replace(/[^\d.-]/g, "");
         if (avg === "" || isNaN(avg)) avg = "0";
 
-        // --- TONNAGE (à remplir plus tard) ---
-        let tonnage = "";
+let tonnage = 0;
+if (row.dataset.tonnage) {
+    tonnage = parseFloat(row.dataset.tonnage);
+    tonnage = Number(tonnage.toFixed(1)); // 🔥 arrondi à 0.1 tonne
+}
 
-        csv += `${date},${kwh},${m3},${duree},${totalMinutes},${avg},${tonnage}\n`;
-    });
 
-    // Téléchargement
+
+        csv += `${date},${kwh},${m3},${duree},${mins},${avg},${tonnage}\n`;
+    }
+
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "export_gaz.csv";
     link.click();
 });
-
 
 
 
@@ -2162,6 +2337,21 @@ if (last) {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
